@@ -1,0 +1,218 @@
+{
+  "reviewDate": "2026-09-11",
+  "spreadsheetId": "1FVAXuU3M4Odj1YI6wzOJNQt67cLZ5YpFfiU501o_tfs",
+  "scope": "Current lifecycle tables only; hidden legacy tables excluded from counts; read-only snapshot, not live AppSheet execution test.",
+  "counts": {
+    "New Feature Requests": 63,
+    "ECR": 38,
+    "OCR": 25,
+    "Roadmap Features": 18,
+    "Complete": 13,
+    "Archive": 2,
+    "Declined": 0
+  },
+  "uniqueRequests": 78,
+  "uniqueUsedIds": 78,
+  "fieldsCompared": [
+    "In-Work Document",
+    "Last Status Update",
+    "Change Type",
+    "Status",
+    "What updates or new features would you like to see added to your Gigabot? (Please list only one feature per form submission)",
+    "Priority",
+    "Is on the Roadmap?",
+    "In-Work Document Link",
+    "Project Lead",
+    "Progress"
+  ],
+  "storedFieldDifferences": [
+    {
+      "id": "2022011",
+      "table": "ECR",
+      "field": "Progress",
+      "newFeatureRequests": "ORR",
+      "copy": "Final Review",
+      "sourceRow": 5,
+      "copyRow": 4
+    },
+    {
+      "id": "2022057",
+      "table": "ECR",
+      "field": "Progress",
+      "newFeatureRequests": "ORR",
+      "copy": "Final Review",
+      "sourceRow": 10,
+      "copyRow": 8
+    },
+    {
+      "id": "2024008",
+      "table": "ECR",
+      "field": "Last Status Update",
+      "newFeatureRequests": "5/14/2026",
+      "copy": "8/5/2025",
+      "sourceRow": 21,
+      "copyRow": 13
+    },
+    {
+      "id": "2024008",
+      "table": "ECR",
+      "field": "Priority",
+      "newFeatureRequests": "Low",
+      "copy": "",
+      "sourceRow": 21,
+      "copyRow": 13
+    },
+    {
+      "id": "2024008",
+      "table": "ECR",
+      "field": "Is on the Roadmap?",
+      "newFeatureRequests": "No",
+      "copy": "",
+      "sourceRow": 21,
+      "copyRow": 13
+    },
+    {
+      "id": "2025004",
+      "table": "ECR",
+      "field": "Last Status Update",
+      "newFeatureRequests": "3/12/2026",
+      "copy": "11/14/2025",
+      "sourceRow": 26,
+      "copyRow": 25
+    },
+    {
+      "id": "2025004",
+      "table": "ECR",
+      "field": "Progress",
+      "newFeatureRequests": "CDR",
+      "copy": "SRR",
+      "sourceRow": 26,
+      "copyRow": 25
+    },
+    {
+      "id": "2025009",
+      "table": "ECR",
+      "field": "Last Status Update",
+      "newFeatureRequests": "5/14/2026",
+      "copy": "9/29/2025",
+      "sourceRow": 30,
+      "copyRow": 29
+    },
+    {
+      "id": "2026011",
+      "table": "ECR",
+      "field": "Last Status Update",
+      "newFeatureRequests": "5/14/2026",
+      "copy": "3/10/2026",
+      "sourceRow": 57,
+      "copyRow": 35
+    },
+    {
+      "id": "2026011",
+      "table": "ECR",
+      "field": "Progress",
+      "newFeatureRequests": "PDR",
+      "copy": "SRR",
+      "sourceRow": 57,
+      "copyRow": 35
+    },
+    {
+      "id": "2026012",
+      "table": "ECR",
+      "field": "Last Status Update",
+      "newFeatureRequests": "5/14/2026",
+      "copy": "4/2/2026",
+      "sourceRow": 58,
+      "copyRow": 36
+    },
+    {
+      "id": "2026013",
+      "table": "ECR",
+      "field": "Last Status Update",
+      "newFeatureRequests": "5/14/2026",
+      "copy": "4/9/2026",
+      "sourceRow": 59,
+      "copyRow": 37
+    },
+    {
+      "id": "2026013",
+      "table": "ECR",
+      "field": "Progress",
+      "newFeatureRequests": "CDR",
+      "copy": "SRR",
+      "sourceRow": 59,
+      "copyRow": 37
+    },
+    {
+      "id": "2026014",
+      "table": "ECR",
+      "field": "Last Status Update",
+      "newFeatureRequests": "5/14/2026",
+      "copy": "4/21/2026",
+      "sourceRow": 60,
+      "copyRow": 38
+    },
+    {
+      "id": "2026014",
+      "table": "ECR",
+      "field": "Priority",
+      "newFeatureRequests": "High",
+      "copy": "Medium",
+      "sourceRow": 60,
+      "copyRow": 38
+    },
+    {
+      "id": "2026014",
+      "table": "ECR",
+      "field": "Project Lead",
+      "newFeatureRequests": "Mitchell Mashburn, Domenic Cordova",
+      "copy": "",
+      "sourceRow": 60,
+      "copyRow": 38
+    },
+    {
+      "id": "2022079",
+      "table": "OCR",
+      "field": "Is on the Roadmap?",
+      "newFeatureRequests": "No",
+      "copy": "",
+      "sourceRow": 48,
+      "copyRow": 17
+    },
+    {
+      "id": "2026006",
+      "table": "OCR",
+      "field": "Last Status Update",
+      "newFeatureRequests": "5/14/2026",
+      "copy": "2/9/2026",
+      "sourceRow": 54,
+      "copyRow": 22
+    }
+  ],
+  "linkFindings": [
+    {
+      "id": "2025002",
+      "issue": "Different actual document IDs",
+      "newFeatureRequestsAndECR": "1yn44B1-XsWpEHaeCbPTvut4nrtJpLjOxyJJqXFyW190",
+      "roadmap": "1sSRw_n68_kIB9gDqPAk0DkFMng45J6dZBJIY85cYrWg"
+    },
+    {
+      "id": "2022063",
+      "issue": "Roadmap link blank; source link present"
+    },
+    {
+      "id": "2022070",
+      "issue": "Roadmap link blank; source link present"
+    }
+  ],
+  "displayOnlyDifferences": [
+    {
+      "id": "2025006",
+      "issue": "URL versus smart chip; actual target is the same"
+    },
+    {
+      "id": "2025010",
+      "issue": "URL versus smart chip; actual target is the same"
+    }
+  ]
+}
