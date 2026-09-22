@@ -20,6 +20,41 @@ No cloud infrastructure, real authentication, shared Supabase persistence, autom
 
 ## Latest workflow feedback and completed milestone
 
+Features' “Awaiting a start” count displays without leading zero padding (0 instead of 00).
+
+Dark mode is now the default when no theme preference is saved (including unavailable storage). Explicit saved light-mode choices are still respected. Server markup and cross-tab preference resets also default to dark.
+
+The browser tab icon uses the official re3D cube PNGs via Next metadata, with black/white variants selected by the browser's preferred color scheme for tab-strip contrast.
+
+Sidebar placeholder icon replaced with official unmodified transparent re3D cube artwork from the brand-style downloads, stored in public/brand. Black artwork is used in light mode, white in dark mode, beside the existing re:3D wordmark. Source URLs recorded in public/brand/README.md.
+
+September 22 — Brand colors matched to the official https://re3d.org/brand-style/ digital palette: #FFD400 yellow, #000000 black, #FFFFFF white, #393B3E charcoal, #BCBEC0 gray. These are published hex colors, not verified Pantone codes. src/app/brand.css replaces the earlier sage/green brand tints with neutral surfaces and yellow primary/selected accents in both themes while keeping semantic red/blue colors. Existing logo placeholder and typography are unchanged.
+
+September 22 — LAN preview: pnpm run start:lan listens on 0.0.0.0:3000 (current Wi-Fi address 192.168.1.84). Local-only start remains available. Added getRandomValues UUID fallback and IndexedDB transaction serialization when Web Locks is unavailable on HTTP LAN origins. Browser-tested creation at the LAN URL; storage is separate from localhost and every other browser/device. This is still an unauthenticated sample prototype, not shared database hosting. Firewall inspection was declined; firewall settings were not changed and access from another physical device is not verified.
+
+September 22 — Added a header light/dark toggle. Theme preference is stored separately in product-development-theme and applied before page rendering to avoid a light flash on reload. Default remains light; storage failure does not prevent toggling. Color tokens cover existing screens, forms, badges and overlays, with light colors kept as fallbacks. No workspace records changed.
+
+Home is now the default page on reload and the brand link destination. A Home sidebar link precedes the collapsed Features/Software/Systems folders. The overview uses live local records: three clickable section cards show active totals, status/type breakdowns, high-priority and unassigned counts. A combined six-item Recently updated list includes closed records and opens the existing previews. No new workflow or persistence model. Implemented in src/components/home.tsx.
+
+Sidebar expand/collapse arrows sit to the left of the Features, Software and Systems page buttons; keyboard order follows the visible order.
+
+Features, Software and Systems sidebar folders now default to collapsed on every page load. Their page buttons and independent expand/collapse controls remain available; expansion is not persisted across reloads.
+
+Sidebar workspace order is now Features, Software, Systems, followed by the existing History section. Each retains its independent page button, collapse control and child navigation.
+
+September 21 — Latest Software layout supersedes the compact filter panel below: mirror Features. Search and inline Type/Owner/Application dropdowns above one shared toolbar, with All active/Requests/In work/Testing buttons on the left and Recent/Priority/Progress/Title sort choices on the right. Result count and Clear filters sit below the list. Uses the same feature filterbar, segmented and sorting components/styles. No workflow changes.
+
+September 21 — Supersedes the toolbar cleanup below: Software now has one compact Search / Filters / Sort dropdown row. Filters is a collapsed-by-default panel with Type, Status, Owner, Application, Clear filters and Done. The Filters button counts active filters (excluding search and the fixed type on subpages). Sort choices remain Recently updated, Priority, Progress and Title. Narrow phone widths allow wrapping. No record/workflow changes.
+
+September 21 — Cleaned up Software's double toolbar appearance. Type/status selections are explicitly labeled and grouped with the filters above the list, without a separate bordered toolbar. One sorting toolbar retains counts, Clear filters and Recent/Priority/Progress/Title choices. Filtering behavior is unchanged.
+
+September 18 — Clarification: the user wanted the feature-style SELECTION BAR, not engineering review stages or a new progress graphic. Software retains Request → In work → Testing → Complete. Edit software uses Request/In work/Testing selection buttons, saved with Save changes; Request cannot be selected once started, and Testing follows In work. Testing can return to In work. Complete remains a separate lifecycle action available from Testing; Archive/Decline/Cancel/Restore remain separate. Removed the temporary SRR/PDR/CDR/ORR/Final Review fields, filters and graphics. Older original saves remain valid; short-lived ORR/Final Review saves map active/restore In work to Testing and retain history. All 33 tests and build pass.
+
+Software list controls: main-page type buttons, Request/In work/Testing status buttons, owner/application dropdowns, Recent/Priority/Progress/Title sorting, counts and clear filters. Software includes change requests and bugs, SW-YYYY-NNN numbering, application/version, owners, priority, reproduction details, documents and activity. Software permanent deletion, releases, Git integration and formal test management are not implemented.
+Features and systems show Linked software sections with Manage links. Software's Linked work tab supports reciprocal navigation, links to multiple features/systems, and Related versus Required for completion feature links. Feature completion is blocked if any required software is not Complete (including archived/cancelled software). A completed feature cannot gain an unfinished required item until restored; if completed software is later reopened, the feature preview flags the unfinished dependency without silently changing feature status. Users may explicitly change required links to Related or unlink them; changes are logged on the software record. System status remains independent. Permanent feature/system deletion cleans references and their associated software activity without deleting the software itself.
+
+Persistence migration adds software: [] and softwareCounters: {} to existing data without reset. Revision checks protect software edits, links and document drafts; dependency validation reads the current shared state at feature-save time. Added six automated software scenarios; all 31 tests and build/typecheck pass. Browser checks covered software creation, required and related linking, reciprocal feature navigation, blocked feature completion, unlinking, bug-report form, software activity, shared Archive filtering, and restore. Created sample SW-2026-001 “Prototype check — calibration software”; restored it to Request and removed its temporary dependency on feature 2026-001. Existing feature status/details were not changed.
+
 System readable numbers now use SYS-YYYY-NNN. Saved PRJ numbers migrate to SYS on load, keeping the same internal IDs, year/sequence, links, documents, history and counters. This supersedes the earlier decision to retain PRJ during the terminology-only rename.
 
 Terminology update: user-facing Projects/Project is now Systems/System throughout navigation, page views, history kinds/filters, forms, actions, document sections, feature links, messages, and generated activity labels. Internal project storage keys/types and existing PRJ numbers stay unchanged for saved-data compatibility. Existing user-authored titles/notes are preserved. Build and all 24 tests passed.
@@ -91,3 +126,4 @@ Main difficulties from history: cross-table copies falling out of sync, reverse 
 Distinguish reported intent/history from verified current configuration. The AppSheet editor requires sign-in in the available browser. Final bot definitions, scripts, keys/types/formulas, permissions, external-app security, licensing, deployment, and execution logs were not inspected. Earlier assistant suggestions are not proof of implemented features or correct platform behavior. No cloud edits were made.
 
 Platform facts verified in official Google documentation: app-event bots do not cross between separate apps sharing data; bot chaining needs explicit configuration; programmatic spreadsheet writes do not generally fire Apps Script edit triggers; ordinary max-plus-one IDs are not concurrency-safe for distributed/offline creation; sync and security require configuration-aware treatment.
+

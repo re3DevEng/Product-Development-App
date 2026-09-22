@@ -1,3 +1,4 @@
+import { newId } from "./browser-support";
 import {
   parseDriveLink,
   type AppState,
@@ -84,7 +85,7 @@ const event = (
   at: string,
   featureId?: string,
 ): ProjectActivity => ({
-  id: crypto.randomUUID(),
+  id: newId(),
   actor: "Demo user",
   summary,
   at,
@@ -196,7 +197,7 @@ export function createProject(
     throw new Error("The system number is already in use.");
   const project: Project = {
     ...fields,
-    id: crypto.randomUUID(),
+    id: newId(),
     number,
     revision: 1,
     status: "In work",
@@ -291,11 +292,18 @@ export function deleteProject(
       "Type the system number exactly to confirm permanent deletion.",
     );
   // Features and their history are independent; counters prevent number reuse.
-  return { ...state, projects: state.projects.filter((p) => p.id !== id), software: state.software.map(s => {
-    const systemIds = s.systemIds.filter(systemId => systemId !== id);
-    const activity = s.activity.filter(a => a.systemId !== id);
-    return systemIds.length !== s.systemIds.length || activity.length !== s.activity.length ? { ...s, systemIds, activity, revision: s.revision + 1 } : s;
-  }) };
+  return {
+    ...state,
+    projects: state.projects.filter((p) => p.id !== id),
+    software: state.software.map((s) => {
+      const systemIds = s.systemIds.filter((systemId) => systemId !== id);
+      const activity = s.activity.filter((a) => a.systemId !== id);
+      return systemIds.length !== s.systemIds.length ||
+        activity.length !== s.activity.length
+        ? { ...s, systemIds, activity, revision: s.revision + 1 }
+        : s;
+    }),
+  };
 }
 export function linkProjectFeature(
   state: AppState,
@@ -341,7 +349,7 @@ export function addProjectDocument(
         ...current.documents,
         {
           ...link,
-          id: crypto.randomUUID(),
+          id: newId(),
           title: title.trim(),
           role: "Supporting file",
         },

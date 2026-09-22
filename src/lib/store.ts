@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { readState, type AppState } from "./domain";
 import { makeSampleState } from "./seed";
+import { withWorkspaceLock } from "./browser-support";
 
 const KEY = "re3d-product-development-demo-v1";
 const LOCK = `${KEY}-write`;
@@ -29,11 +30,7 @@ export function useWorkspaceStore() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
   async function commit(change: (current: AppState) => AppState) {
-    if (!navigator.locks)
-      throw new Error(
-        "This prototype needs a browser with Web Locks support. Please open it in a current Chrome or Edge browser on localhost.",
-      );
-    await navigator.locks.request(LOCK, () => {
+    await withWorkspaceLock(LOCK, () => {
       const raw = localStorage.getItem(KEY);
       const current = raw ? readState(raw) : (state ?? makeSampleState());
       const next = change(current);
@@ -54,11 +51,7 @@ export function useWorkspaceStore() {
     await commit(() => makeSampleState());
   }
   async function recover() {
-    if (!navigator.locks)
-      throw new Error(
-        "Open this prototype in a current Chrome or Edge browser on localhost.",
-      );
-    await navigator.locks.request(LOCK, () => {
+    await withWorkspaceLock(LOCK, () => {
       const next = makeSampleState();
       localStorage.setItem(KEY, JSON.stringify(next));
       setState(next);

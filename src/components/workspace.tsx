@@ -23,6 +23,7 @@ import {
   FileText,
   FlaskConical,
   FolderOpen,
+  House,
   LayoutGrid,
   Link2,
   ListFilter,
@@ -59,6 +60,8 @@ import { Modal, SelectionButtons } from "./shared-ui";
 import { ProjectsList, ProjectDialog } from "./projects";
 import { HistoryList } from "./history";
 import { SoftwareList, SoftwareDialog, LinkedSoftware } from "./software";
+import { HomePage } from "./home";
+import { ThemeToggle } from "./theme-toggle";
 import { softwareDependencies } from "@/lib/software";
 import {
   StageTrack,
@@ -73,6 +76,7 @@ import {
 } from "@/lib/history";
 
 type View =
+  | "Home"
   | "Software"
   | "Software changes"
   | "Bug reports"
@@ -99,9 +103,13 @@ const navItems = [
   { name: "Cancelled", icon: XCircle },
 ] as const;
 const viewDescription: Record<View, string> = {
-  Software: "Software changes and bugs, connected to the features and systems they support.",
-  "Software changes": "Plan and track software improvements through development and testing.",
-  "Bug reports": "Capture problems, reproduce them, and track their resolution.",
+  Home: "Your product development workspace, at a glance.",
+  Software:
+    "Software changes and bugs, connected to the features and systems they support.",
+  "Software changes":
+    "Plan and track software improvements through development and testing.",
+  "Bug reports":
+    "Capture problems, reproduce them, and track their resolution.",
   Systems:
     "A shared home for new machines, custom builds, and the changes that bring them to life.",
   "Active features": "A shared place to move good ideas into better products.",
@@ -139,7 +147,7 @@ function formatDate(date: string) {
 export default function Workspace() {
   const { state, error, commit, reset, recover, download } =
     useWorkspaceStore();
-  const [view, setView] = useState<View>("Active features");
+  const [view, setView] = useState<View>("Home");
   const [search, setSearch] = useState("");
   const [owner, setOwner] = useState("All owners");
   const [product, setProduct] = useState("All products");
@@ -150,12 +158,12 @@ export default function Workspace() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedSoftware, setSelectedSoftware] = useState<string | null>(null);
   const [creatingSoftware, setCreatingSoftware] = useState(false);
-  const [softwareExpanded, setSoftwareExpanded] = useState(true);
+  const [softwareExpanded, setSoftwareExpanded] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
   const [creating, setCreating] = useState(false);
   const [mobile, setMobile] = useState(false);
-  const [featuresExpanded, setFeaturesExpanded] = useState(true);
-  const [projectsExpanded, setProjectsExpanded] = useState(true);
+  const [featuresExpanded, setFeaturesExpanded] = useState(false);
+  const [projectsExpanded, setProjectsExpanded] = useState(false);
   const [toast, setToast] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
   const [resetError, setResetError] = useState("");
@@ -262,9 +270,16 @@ export default function Workspace() {
           : b.updatedAt.localeCompare(a.updatedAt),
     );
   const isHistory = HISTORY_STATUSES.includes(view as HistoryStatus);
-  const isSoftware = ["Software", "Software changes", "Bug reports"].includes(view);
+  const isSoftware = ["Software", "Software changes", "Bug reports"].includes(
+    view,
+  );
   const isList =
-    view !== "Settings" && view !== "Help" && view !== "Systems" && !isHistory && !isSoftware;
+    view !== "Home" &&
+    view !== "Settings" &&
+    view !== "Help" &&
+    view !== "Systems" &&
+    !isHistory &&
+    !isSoftware;
   const selectedFeature = state.features.find((f) => f.id === selected);
   return (
     <div className="app-shell">
@@ -284,11 +299,24 @@ export default function Workspace() {
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            navigate("Active features");
+            navigate("Home");
           }}
         >
-          <span className="brand-mark">
-            <Shapes size={24} strokeWidth={1.8} />
+          <span className="brand-mark" aria-hidden="true">
+            <img
+              className="brand-logo-light"
+              src="/brand/re3d-black.png"
+              alt=""
+              width={48}
+              height={48}
+            />
+            <img
+              className="brand-logo-dark"
+              src="/brand/re3d-white.png"
+              alt=""
+              width={48}
+              height={48}
+            />
           </span>
           <span className="brand-word">
             re:3D<span>PRODUCT DEVELOPMENT</span>
@@ -298,7 +326,25 @@ export default function Workspace() {
           WORKSPACE <span>Internal</span>
         </div>
         <nav>
+          <button
+            className={`nav-item ${view === "Home" ? "selected" : ""}`}
+            onClick={() => navigate("Home")}
+            aria-current={view === "Home" ? "page" : undefined}
+          >
+            <House size={18} />
+            <span>Home</span>
+          </button>
           <div className="nav-parent-row">
+            <button
+              className="nav-fold"
+              aria-label={`${featuresExpanded ? "Collapse" : "Expand"} Features submenu`}
+              aria-expanded={featuresExpanded}
+              aria-controls="feature-navigation"
+              title={`${featuresExpanded ? "Collapse" : "Expand"} feature views`}
+              onClick={() => setFeaturesExpanded((value) => !value)}
+            >
+              <ChevronRight size={17} />
+            </button>
             <button
               className={`nav-item ${view === "Active features" ? "selected" : ""}`}
               onClick={() => navigate("Active features")}
@@ -310,16 +356,6 @@ export default function Workspace() {
                 Features<small>View all features</small>
               </span>
               <span className="nav-count">{active.length}</span>
-            </button>
-            <button
-              className="nav-fold"
-              aria-label={`${featuresExpanded ? "Collapse" : "Expand"} Features submenu`}
-              aria-expanded={featuresExpanded}
-              aria-controls="feature-navigation"
-              title={`${featuresExpanded ? "Collapse" : "Expand"} feature views`}
-              onClick={() => setFeaturesExpanded((value) => !value)}
-            >
-              <ChevronRight size={17} />
             </button>
           </div>
           <div
@@ -355,6 +391,66 @@ export default function Workspace() {
           </div>
           <div className="nav-parent-row">
             <button
+              className="nav-fold"
+              aria-label={`${softwareExpanded ? "Collapse" : "Expand"} Software submenu`}
+              aria-expanded={softwareExpanded}
+              aria-controls="software-navigation"
+              onClick={() => setSoftwareExpanded(!softwareExpanded)}
+            >
+              <ChevronRight size={17} />
+            </button>
+            <button
+              className={`nav-item ${view === "Software" ? "selected" : ""}`}
+              onClick={() => navigate("Software")}
+              aria-current={view === "Software" ? "page" : undefined}
+            >
+              <Code2 size={18} />
+              <span className="nav-page-label">
+                Software<small>View all software</small>
+              </span>
+              <span className="nav-count">
+                {
+                  state.software.filter((s) =>
+                    ["Request", "In work", "Testing"].includes(s.status),
+                  ).length
+                }
+              </span>
+            </button>
+          </div>
+          <div
+            id="software-navigation"
+            className="nav-children"
+            role="group"
+            aria-label="Software views"
+            hidden={!softwareExpanded}
+          >
+            <button
+              className={`nav-item ${view === "Software changes" ? "selected" : ""}`}
+              onClick={() => navigate("Software changes")}
+            >
+              <Code2 size={16} />
+              <span>Change requests</span>
+            </button>
+            <button
+              className={`nav-item ${view === "Bug reports" ? "selected" : ""}`}
+              onClick={() => navigate("Bug reports")}
+            >
+              <Bug size={16} />
+              <span>Bug reports</span>
+            </button>
+          </div>
+          <div className="nav-parent-row">
+            <button
+              className="nav-fold"
+              aria-label={`${projectsExpanded ? "Collapse" : "Expand"} Systems submenu`}
+              aria-expanded={projectsExpanded}
+              aria-controls="project-navigation"
+              title={`${projectsExpanded ? "Collapse" : "Expand"} system views`}
+              onClick={() => setProjectsExpanded((value) => !value)}
+            >
+              <ChevronRight size={17} />
+            </button>
+            <button
               className={`nav-item ${view === "Systems" ? "selected" : ""}`}
               onClick={() => navigate("Systems")}
               title="Open all systems"
@@ -372,16 +468,6 @@ export default function Workspace() {
                   ).length
                 }
               </span>
-            </button>
-            <button
-              className="nav-fold"
-              aria-label={`${projectsExpanded ? "Collapse" : "Expand"} Systems submenu`}
-              aria-expanded={projectsExpanded}
-              aria-controls="project-navigation"
-              title={`${projectsExpanded ? "Collapse" : "Expand"} system views`}
-              onClick={() => setProjectsExpanded((value) => !value)}
-            >
-              <ChevronRight size={17} />
             </button>
           </div>
           <div
@@ -423,8 +509,6 @@ export default function Workspace() {
               <p className="nav-empty">No active systems yet</p>
             )}
           </div>
-          <div className="nav-parent-row"><button className={`nav-item ${view === "Software" ? "selected" : ""}`} onClick={() => navigate("Software")} aria-current={view === "Software" ? "page" : undefined}><Code2 size={18}/><span className="nav-page-label">Software<small>View all software</small></span><span className="nav-count">{state.software.filter(s => ["Request","In work","Testing"].includes(s.status)).length}</span></button><button className="nav-fold" aria-label={`${softwareExpanded?"Collapse":"Expand"} Software submenu`} aria-expanded={softwareExpanded} aria-controls="software-navigation" onClick={()=>setSoftwareExpanded(!softwareExpanded)}><ChevronRight size={17}/></button></div>
-          <div id="software-navigation" className="nav-children" role="group" aria-label="Software views" hidden={!softwareExpanded}><button className={`nav-item ${view === "Software changes" ? "selected" : ""}`} onClick={()=>navigate("Software changes")}><Code2 size={16}/><span>Change requests</span></button><button className={`nav-item ${view === "Bug reports" ? "selected" : ""}`} onClick={()=>navigate("Bug reports")}><Bug size={16}/><span>Bug reports</span></button></div>
           <div className="nav-section-label">HISTORY</div>
           {navItems
             .filter((item) =>
@@ -503,10 +587,13 @@ export default function Workspace() {
             <ChevronRight size={14} />
             <strong>{view}</strong>
           </div>
-          <span className="demo-pill">
-            <span />
-            Sample workspace
-          </span>
+          <div className="topbar-actions">
+            <ThemeToggle />
+            <span className="demo-pill">
+              <span />
+              Sample workspace
+            </span>
+          </div>
         </header>
         <main className="main-content">
           <div className="page-heading">
@@ -531,6 +618,15 @@ export default function Workspace() {
               </button>
             )}
           </div>
+          {view === "Home" && (
+            <HomePage
+              state={state}
+              navigate={navigate}
+              openFeature={setSelected}
+              openSoftware={setSelectedSoftware}
+              openSystem={setSelectedProject}
+            />
+          )}
           {view === "Active features" && (
             <div className="stats-grid">
               {[
@@ -569,7 +665,9 @@ export default function Workspace() {
                     <s.icon className={`stat-icon stat-${i}`} size={19} />
                   </span>
                   <span className="stat-value">
-                    {s.value.toString().padStart(2, "0")}
+                    {s.label === "Awaiting a start"
+                      ? s.value
+                      : s.value.toString().padStart(2, "0")}
                   </span>
                   <span className="stat-foot">
                     {s.foot}
@@ -891,7 +989,21 @@ export default function Workspace() {
               create={() => setCreatingProject(true)}
             />
           )}
-          {isSoftware && <SoftwareList key={view} state={state} type={view === "Bug reports" ? "Bug report" : view === "Software changes" ? "Change request" : undefined} open={setSelectedSoftware} create={()=>setCreatingSoftware(true)}/>}
+          {isSoftware && (
+            <SoftwareList
+              key={view}
+              state={state}
+              type={
+                view === "Bug reports"
+                  ? "Bug report"
+                  : view === "Software changes"
+                    ? "Change request"
+                    : undefined
+              }
+              open={setSelectedSoftware}
+              create={() => setCreatingSoftware(true)}
+            />
+          )}
           {view === "Settings" && (
             <SettingsPage
               state={state}
@@ -964,7 +1076,36 @@ export default function Workspace() {
           openSoftware={setSelectedSoftware}
         />
       )}
-      {(creatingSoftware || state.software.some(s=>s.id===selectedSoftware)) && <SoftwareDialog key={creatingSoftware?"new-software":selectedSoftware!} item={creatingSoftware?undefined:state.software.find(s=>s.id===selectedSoftware)} initialType={view==="Bug reports"?"Bug report":"Change request"} state={state} commit={commit} close={()=>{setSelectedSoftware(null);setCreatingSoftware(false);}} created={id=>{setCreatingSoftware(false);setSelectedSoftware(id);}} openFeature={id=>{setSelectedSoftware(null);setSelected(id);}} openSystem={id=>{setSelectedSoftware(null);setSelectedProject(id);}}/>}
+      {(creatingSoftware ||
+        state.software.some((s) => s.id === selectedSoftware)) && (
+        <SoftwareDialog
+          key={creatingSoftware ? "new-software" : selectedSoftware!}
+          item={
+            creatingSoftware
+              ? undefined
+              : state.software.find((s) => s.id === selectedSoftware)
+          }
+          initialType={view === "Bug reports" ? "Bug report" : "Change request"}
+          state={state}
+          commit={commit}
+          close={() => {
+            setSelectedSoftware(null);
+            setCreatingSoftware(false);
+          }}
+          created={(id) => {
+            setCreatingSoftware(false);
+            setSelectedSoftware(id);
+          }}
+          openFeature={(id) => {
+            setSelectedSoftware(null);
+            setSelected(id);
+          }}
+          openSystem={(id) => {
+            setSelectedSoftware(null);
+            setSelectedProject(id);
+          }}
+        />
+      )}
       {resetOpen && (
         <Modal
           label="Reset sample workspace"
@@ -1506,8 +1647,21 @@ function FeatureDialog({
                 </dd>
               </div>
             </dl>
-            {softwareDependencies(state,base.id).length > 0 && <p className="form-error">{softwareDependencies(state,base.id).length} required software item(s) still need completion. {base.status === "Complete" ? "This feature was completed earlier; review its software dependencies." : "Complete them before completing this feature."}</p>}
-            <LinkedSoftware state={state} featureId={base.id} open={openSoftware} commit={commit}/>
+            {softwareDependencies(state, base.id).length > 0 && (
+              <p className="form-error">
+                {softwareDependencies(state, base.id).length} required software
+                item(s) still need completion.{" "}
+                {base.status === "Complete"
+                  ? "This feature was completed earlier; review its software dependencies."
+                  : "Complete them before completing this feature."}
+              </p>
+            )}
+            <LinkedSoftware
+              state={state}
+              featureId={base.id}
+              open={openSoftware}
+              commit={commit}
+            />
             <section className="overview-section">
               <h3>Systems</h3>
               {state.projects.some((p) => p.featureIds.includes(base.id)) ? (

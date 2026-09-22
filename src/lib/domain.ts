@@ -1,5 +1,10 @@
+import { newId } from "./browser-support";
 import { validateProjectState, type Project } from "./projects";
-import { validateSoftwareState, softwareDependencies, type Software } from "./software";
+import {
+  validateSoftwareState,
+  softwareDependencies,
+  type Software,
+} from "./software";
 
 export const STATUSES = [
   "Request",
@@ -69,7 +74,7 @@ export const isActive = (f: Feature) =>
   f.status === "Request" || f.status === "In-Work";
 const ACTOR = "Demo user";
 const event = (summary: string, at: string): Activity => ({
-  id: crypto.randomUUID(),
+  id: newId(),
   at,
   actor: ACTOR,
   summary,
@@ -123,7 +128,7 @@ export function createFeature(
     );
   const feature: Feature = {
     ...fields,
-    id: crypto.randomUUID(),
+    id: newId(),
     number,
     revision: 1,
     hasStarted: false,
@@ -167,8 +172,14 @@ export function updateFeature(
         : input.status,
   });
   const hasStarted = current.hasStarted || next.workType !== "Unassigned";
-  if (next.status === "Complete" && current.status !== "Complete" && softwareDependencies(state, id).length)
-    throw new Error("Complete the required software first, or explicitly change its link to Related before completing this feature.");
+  if (
+    next.status === "Complete" &&
+    current.status !== "Complete" &&
+    softwareDependencies(state, id).length
+  )
+    throw new Error(
+      "Complete the required software first, or explicitly change its link to Related before completing this feature.",
+    );
   if (hasStarted && next.status === "Declined")
     throw new Error("Work has already started. Use Cancel instead of Decline.");
   if (
@@ -230,10 +241,13 @@ export function deleteFeature(
   return {
     ...state,
     features: state.features.filter((f) => f.id !== id),
-    software: state.software.map(s => {
-      const featureLinks = s.featureLinks.filter(l => l.featureId !== id);
-      const activity = s.activity.filter(a => a.featureId !== id);
-      return featureLinks.length !== s.featureLinks.length || activity.length !== s.activity.length ? { ...s, featureLinks, activity, revision: s.revision + 1 } : s;
+    software: state.software.map((s) => {
+      const featureLinks = s.featureLinks.filter((l) => l.featureId !== id);
+      const activity = s.activity.filter((a) => a.featureId !== id);
+      return featureLinks.length !== s.featureLinks.length ||
+        activity.length !== s.activity.length
+        ? { ...s, featureLinks, activity, revision: s.revision + 1 }
+        : s;
     }),
     projects: state.projects.map((p) => {
       const activity = p.activity.filter((a) => a.featureId !== id);
@@ -310,7 +324,7 @@ export function addDocument(
     updatedAt: now,
     documents: [
       ...current.documents,
-      { ...link, id: crypto.randomUUID(), title: title.trim(), role },
+      { ...link, id: newId(), title: title.trim(), role },
     ],
     activity: [
       event(`Linked ${role}: ${title.trim()}`, now),

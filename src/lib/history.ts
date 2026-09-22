@@ -1,5 +1,6 @@
 import { STAGES, type AppState } from "./domain";
 import { PROJECT_PHASES } from "./projects";
+import { SOFTWARE_STAGES, softwareProgress } from "./software";
 
 export const HISTORY_STATUSES = [
   "Archive",
@@ -10,6 +11,23 @@ export const HISTORY_STATUSES = [
 export type HistoryStatus = (typeof HISTORY_STATUSES)[number];
 export function historyItems(state: AppState, status: HistoryStatus) {
   return [
+    ...state.software
+      .filter((s) => s.status === status)
+      .map((s) => ({
+        id: s.id,
+        number: s.number,
+        title: s.title,
+        description: s.description,
+        kind: "Software" as const,
+        category: s.type,
+        priority: s.priority,
+        owners: s.owners,
+        products: s.application ? [s.application] : [],
+        stage: softwareProgress(s),
+        stages: [...SOFTWARE_STAGES] as string[],
+        roadmap: false,
+        updatedAt: s.updatedAt,
+      })),
     ...state.features
       .filter((f) => f.status === status)
       .map((f) => ({

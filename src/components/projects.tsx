@@ -649,7 +649,12 @@ export function ProjectDialog({
                       <p>No documents linked yet.</p>
                     )}
                   </section>
-                  <LinkedSoftware state={state} systemId={base.id} open={openSoftware} commit={commit}/>
+                  <LinkedSoftware
+                    state={state}
+                    systemId={base.id}
+                    open={openSoftware}
+                    commit={commit}
+                  />
                   <p className="project-footnote">
                     Created {new Date(base.createdAt).toLocaleDateString()} ·
                     Updated {new Date(base.updatedAt).toLocaleDateString()}

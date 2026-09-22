@@ -7,17 +7,24 @@ function initials(name: string) {
     .join("");
 }
 export function StageTrack({ feature }: { feature: Feature }) {
-  if (feature.stage === "Not started") return null;
+  return (
+    <ReviewStageTrack stage={feature.stage} stages={STAGES[feature.workType]} />
+  );
+}
+export function ReviewStageTrack({
+  stage,
+  stages,
+}: {
+  stage: string;
+  stages: readonly string[];
+}) {
+  if (stage === "Not started") return null;
   return (
     <span className="stage-track" aria-hidden="true">
-      {STAGES[feature.workType].slice(1).map((stage, index) => (
+      {stages.slice(1).map((label, index) => (
         <i
-          className={
-            index < STAGES[feature.workType].indexOf(feature.stage)
-              ? "filled"
-              : ""
-          }
-          key={stage}
+          className={index < stages.indexOf(stage) ? "filled" : ""}
+          key={label}
         />
       ))}
     </span>

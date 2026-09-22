@@ -51,6 +51,9 @@ pnpm start
 
 ## What is implemented
 
+- Software change requests and bug reports with SW numbers, owners, priority, component/version, reproduction details, Request/In work/Testing selection bar, separate completion and lifecycle actions, Drive document links, and activity history.
+- Many-to-many software links to features and systems. Features distinguish Related from Required for completion; unfinished required software blocks feature completion. Link changes are logged in software Activity. Software has its own sidebar section and shares History tabs with features/systems.
+
 - Individual project Documents tabs and overview document summaries: named Google Drive/Docs file links, duplicate checks, and activity history. Existing project records gain an empty documents list automatically.
 
 - Shared Complete, Archive, Declined, and Cancelled history for projects and features, with All/Features/Projects buttons, search, owner/product filters, and sorting. The Projects page shows active work; projects do not use Declined.
@@ -108,3 +111,10 @@ The workflow tests cover number allocation, shared-view consistency, archive/res
 
 Earlier decisions and findings are in `PROJECT_CONTEXT.md`, `FIRST_VERSION_DESIGN.md`, `PRODUCT_DEVELOPMENT_APP_BRIEF.md`, and `NEW_FEATURE_REQUEST_APP_REVIEW.md`.
 
+
+
+## Local network preview
+
+After building, run `pnpm run start:lan` to serve on port 3000 across the local network. Open `http://<this-computer-IP>:3000` on another device on the same network. The host must remain awake with the server running. Windows Firewall may require permission for private-network access; do not configure router port forwarding for this prototype.
+
+Records remain in each browser's local storage, separately for each address and device. LAN access does not provide shared data or authentication. The app supports saving on HTTP LAN addresses using IndexedDB serialization and cryptographic ID generation.

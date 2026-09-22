@@ -11,11 +11,13 @@ export function HistoryList({
   status,
   openFeature,
   openProject,
+  openSoftware,
 }: {
   state: AppState;
   status: HistoryStatus;
   openFeature: (id: string) => void;
   openProject: (id: string) => void;
+  openSoftware: (id: string) => void;
 }) {
   const [kind, setKind] = useState("All");
   const [search, setSearch] = useState("");
@@ -26,7 +28,8 @@ export function HistoryList({
   const items = all
     .filter(
       (item) =>
-        (kind === "All" || `${item.kind}s` === kind) &&
+        (kind === "All" ||
+          (item.kind === "Software" ? "Software" : `${item.kind}s`) === kind) &&
         (owner === "All owners" ||
           (owner === "Unassigned"
             ? !item.owners.length
@@ -98,7 +101,7 @@ export function HistoryList({
         <SelectionButtons
           label="Show history for"
           value={kind}
-          options={["All", "Features", "Systems"]}
+          options={["All", "Features", "Systems", "Software"]}
           onChange={setKind}
           compact
         />
@@ -115,7 +118,7 @@ export function HistoryList({
           <table className="feature-table">
             <thead>
               <tr>
-                <th>System / feature</th>
+                <th>Item</th>
                 <th>Status</th>
                 <th>Priority</th>
                 <th>Owner</th>
@@ -132,14 +135,18 @@ export function HistoryList({
                     <button
                       className="feature-link"
                       onClick={() =>
-                        item.kind === "System"
-                          ? openProject(item.id)
-                          : openFeature(item.id)
+                        item.kind === "Software"
+                          ? openSoftware(item.id)
+                          : item.kind === "System"
+                            ? openProject(item.id)
+                            : openFeature(item.id)
                       }
                     >
                       <span className="feature-meta">
                         <span className="feature-number">{item.number}</span>
-                        {item.kind === "System" ? (
+                        {item.kind === "Software" ? (
+                          <span className="type-tag">{item.category}</span>
+                        ) : item.kind === "System" ? (
                           <span className="type-tag" title={item.category}>
                             System
                           </span>
@@ -201,9 +208,11 @@ export function HistoryList({
                       className="icon-button row-arrow"
                       aria-label={`Open ${item.title}`}
                       onClick={() =>
-                        item.kind === "System"
-                          ? openProject(item.id)
-                          : openFeature(item.id)
+                        item.kind === "Software"
+                          ? openSoftware(item.id)
+                          : item.kind === "System"
+                            ? openProject(item.id)
+                            : openFeature(item.id)
                       }
                     >
                       <ChevronRight size={17} />
