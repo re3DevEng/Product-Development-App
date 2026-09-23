@@ -62,6 +62,8 @@ import { HistoryList } from "./history";
 import { SoftwareList, SoftwareDialog, LinkedSoftware } from "./software";
 import { HomePage } from "./home";
 import { ThemeToggle } from "./theme-toggle";
+import { PdmLibrary, PdmDialog } from "./pdm";
+import { PartChanges } from "./part-changes";
 import { softwareDependencies } from "@/lib/software";
 import {
   StageTrack,
@@ -77,6 +79,7 @@ import {
 
 type View =
   | "Home"
+  | "PDM Library"
   | "Software"
   | "Software changes"
   | "Bug reports"
@@ -104,6 +107,8 @@ const navItems = [
 ] as const;
 const viewDescription: Record<View, string> = {
   Home: "Your product development workspace, at a glance.",
+  "PDM Library":
+    "Parts and assemblies, connected to the changes that develop them.",
   Software:
     "Software changes and bugs, connected to the features and systems they support.",
   "Software changes":
@@ -157,6 +162,11 @@ export default function Workspace() {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedSoftware, setSelectedSoftware] = useState<string | null>(null);
+  const [selectedPdm, setSelectedPdm] = useState<string | null>(null);
+  const [selectedPdmRevision, setSelectedPdmRevision] = useState<string | null>(
+    null,
+  );
+  const [creatingPdm, setCreatingPdm] = useState<string | null>(null);
   const [creatingSoftware, setCreatingSoftware] = useState(false);
   const [softwareExpanded, setSoftwareExpanded] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -278,6 +288,7 @@ export default function Workspace() {
     view !== "Settings" &&
     view !== "Help" &&
     view !== "Systems" &&
+    view !== "PDM Library" &&
     !isHistory &&
     !isSoftware;
   const selectedFeature = state.features.find((f) => f.id === selected);
@@ -439,6 +450,15 @@ export default function Workspace() {
               <span>Bug reports</span>
             </button>
           </div>
+          <button
+            className={`nav-item ${view === "PDM Library" ? "selected" : ""}`}
+            onClick={() => navigate("PDM Library")}
+            aria-current={view === "PDM Library" ? "page" : undefined}
+          >
+            <Shapes size={18} />
+            <span>PDM Library</span>
+            <span className="nav-count">{state.pdmItems.length}</span>
+          </button>
           <div className="nav-parent-row">
             <button
               className="nav-fold"
@@ -989,6 +1009,15 @@ export default function Workspace() {
               create={() => setCreatingProject(true)}
             />
           )}
+          {view === "PDM Library" && (
+            <PdmLibrary
+              state={state}
+              open={(id) => {
+                setSelectedPdm(id);
+                setSelectedPdmRevision(null);
+              }}
+            />
+          )}
           {isSoftware && (
             <SoftwareList
               key={view}
@@ -1052,6 +1081,43 @@ export default function Workspace() {
           openSoftware={setSelectedSoftware}
         />
       )}
+      {(creatingPdm || state.pdmItems.some((p) => p.id === selectedPdm)) && (
+        <PdmDialog
+          key={
+            creatingPdm
+              ? `new-pdm-${creatingPdm}`
+              : `${selectedPdm}:${selectedPdmRevision}`
+          }
+          sourceFeatureId={creatingPdm ?? undefined}
+          openPart={(id, revisionId) => {
+            setSelectedPdm(id);
+            setSelectedPdmRevision(revisionId ?? null);
+          }}
+          initialRevisionId={selectedPdmRevision ?? undefined}
+          item={
+            creatingPdm
+              ? undefined
+              : state.pdmItems.find((p) => p.id === selectedPdm)
+          }
+          state={state}
+          commit={commit}
+          close={() => {
+            if (creatingPdm) setSelected(creatingPdm);
+            setCreatingPdm(null);
+            setSelectedPdm(null);
+          }}
+          created={(id) => {
+            setSelected(creatingPdm);
+            setCreatingPdm(null);
+            setSelectedPdm(null);
+            setToast("Draft created and linked to this change.");
+          }}
+          openFeature={(id) => {
+            setSelectedPdm(null);
+            setSelected(id);
+          }}
+        />
+      )}
       {(creating || selectedFeature) && (
         <FeatureDialog
           key={creating ? "new" : selectedFeature!.id}
@@ -1068,6 +1134,16 @@ export default function Workspace() {
             setToast("Request created. It’s ready to review.");
           }}
           notify={setToast}
+          createPdm={(featureId) => {
+            setSelected(null);
+            setSelectedPdm(null);
+            setCreatingPdm(featureId);
+          }}
+          openPdm={(id, revisionId) => {
+            setSelected(null);
+            setSelectedPdm(id);
+            setSelectedPdmRevision(revisionId ?? null);
+          }}
           openProject={(id) => {
             setSelected(null);
             setCreating(false);
@@ -1201,6 +1277,8 @@ function FeatureDialog({
   notify,
   openProject,
   openSoftware,
+  openPdm,
+  createPdm,
 }: {
   feature?: Feature;
   state: AppState;
@@ -1210,6 +1288,8 @@ function FeatureDialog({
   notify: (message: string) => void;
   openProject: (id: string) => void;
   openSoftware: (id: string) => void;
+  openPdm: (id: string, revisionId?: string) => void;
+  createPdm: (featureId: string) => void;
 }) {
   const [base, setBase] = useState(feature);
   const [editing, setEditing] = useState(!feature);
@@ -1661,6 +1741,13 @@ function FeatureDialog({
               featureId={base.id}
               open={openSoftware}
               commit={commit}
+            />
+            <PartChanges
+              state={state}
+              feature={base}
+              commit={commit}
+              create={() => createPdm(base.id)}
+              open={openPdm}
             />
             <section className="overview-section">
               <h3>Systems</h3>

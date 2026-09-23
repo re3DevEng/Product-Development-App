@@ -1,4 +1,6 @@
 import { newId } from "./browser-support";
+import { validatePdmState, type PdmItem } from "./pdm";
+import { validatePartChanges, type PartChange } from "./model-revisions";
 import { validateProjectState, type Project } from "./projects";
 import {
   validateSoftwareState,
@@ -69,6 +71,9 @@ export type AppState = {
   projectCounters: Record<string, number>;
   software: Software[];
   softwareCounters: Record<string, number>;
+  pdmItems: PdmItem[];
+  pdmCounter: number;
+  partChanges: PartChange[];
 };
 export const isActive = (f: Feature) =>
   f.status === "Request" || f.status === "In-Work";
@@ -241,6 +246,17 @@ export function deleteFeature(
   return {
     ...state,
     features: state.features.filter((f) => f.id !== id),
+    partChanges: state.partChanges.map((c) =>
+      c.featureId === id ? { ...c, featureId: null } : c,
+    ),
+    pdmItems: state.pdmItems.map((p) => {
+      const featureIds = p.featureIds.filter((featureId) => featureId !== id);
+      const activity = p.activity.filter((a) => a.featureId !== id);
+      return featureIds.length !== p.featureIds.length ||
+        activity.length !== p.activity.length
+        ? { ...p, featureIds, activity, revision: p.revision + 1 }
+        : p;
+    }),
     software: state.software.map((s) => {
       const featureLinks = s.featureLinks.filter((l) => l.featureId !== id);
       const activity = s.activity.filter((a) => a.featureId !== id);
@@ -435,5 +451,7 @@ export function readState(raw: string): AppState {
     throw new Error("Saved feature identifiers must be unique.");
   validateProjectState(value);
   validateSoftwareState(value);
+  validatePdmState(value);
+  validatePartChanges(value);
   return value;
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./brand.css";
+import "./pdm.css";
 
 export const metadata: Metadata = {
   title: "Product Development | re:3D",

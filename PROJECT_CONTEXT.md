@@ -127,3 +127,6 @@ Distinguish reported intent/history from verified current configuration. The App
 
 Platform facts verified in official Google documentation: app-event bots do not cross between separate apps sharing data; bot chaining needs explicit configuration; programmatic spreadsheet writes do not generally fire Apps Script edit triggers; ordinary max-plus-one IDs are not concurrency-safe for distributed/offline creation; sync and security require configuration-aware treatment.
 
+# PDM foundation - September 23, 2026
+
+Milestone 1 is implemented in `src/lib/pdm.ts` and `src/components/pdm.tsx`, with sidebar and feature-preview integration. See `PDM_DESIGN.md` for decisions and implementation boundaries. All PDM items are draft records, not released files. Storage remains browser-local. Shared sequential internal numbering with creator initials is a provisional implementation choice. Existing data is preserved by additive migration. The PDM planning summary is available in `output/pdf/PDM_Workflow_and_Rules.pdf`.

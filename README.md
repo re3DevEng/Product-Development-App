@@ -115,6 +115,25 @@ Earlier decisions and findings are in `PROJECT_CONTEXT.md`, `FIRST_VERSION_DESIG
 
 ## Local network preview
 
+### PDM draft register
+
+Open a part/assembly's Drawings tab to add Machining, Inspection, or Assembly drawing records, record working-version notes, and assess required drawing types. Drawing drafts stay at Rev0.1 while working versions advance; no drawing is approved or released by these actions. This milestone stores metadata only, with no file transfer or Drive integration.
+
+Create a draft part or assembly from an active ECR/OCR's Parts & assemblies section; the app assigns its internal ID, links the source automatically, and returns to the change after saving or cancelling. The sidebar's PDM Library is for browsing existing records, with optional Ops-assigned Odoo numbers, owners, links, and activity history. Select a record to preview it, then use Edit record to change it. All items remain Draft at Rev0.1; files and controlled releases are not connected yet. Existing browser data upgrades without resetting it. See `PDM_DESIGN.md` for the agreed rules, current scope, and next milestones.
+
+On this Windows computer, double-click `Start Product Development.exe` in the project folder. It starts the existing production build on port 3000, listens on the local network, and opens the current network address in your default browser. If the app is already responding there, it opens that instance instead. The address is detected each time, so it is not tied to a particular `192.168.1.x` address.
+
+The server runs in the background and stays running after the launcher/browser closes, until the computer restarts or the server is stopped. Keep this computer awake for other devices to connect. This is a launcher for this installed app, not a standalone copy of the app or an internet hosting service. It requires Node.js, the project dependencies, and an existing `.next` production build. It does not rebuild code, change firewall settings, or share browser-local records. You can create a Windows shortcut to the executable for easier access.
+
+Launcher source: `tools/launcher/ServerLauncher.cs`. To rebuild it from the project folder in PowerShell:
+
+```powershell
+& 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe' /nologo /target:winexe '/out:Start Product Development.exe' /reference:System.Windows.Forms.dll tools\launcher\ServerLauncher.cs
+```
+
+The executable supports `--check` to verify the current network endpoint without starting a server or opening a browser (exit code 0 means success).
+
 After building, run `pnpm run start:lan` to serve on port 3000 across the local network. Open `http://<this-computer-IP>:3000` on another device on the same network. The host must remain awake with the server running. Windows Firewall may require permission for private-network access; do not configure router port forwarding for this prototype.
 
 Records remain in each browser's local storage, separately for each address and device. LAN access does not provide shared data or authentication. The app supports saving on HTTP LAN addresses using IndexedDB serialization and cryptographic ID generation.
+

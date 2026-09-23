@@ -295,6 +295,10 @@ export function deleteProject(
   return {
     ...state,
     projects: state.projects.filter((p) => p.id !== id),
+    partChanges: state.partChanges.map((c) => ({
+      ...c,
+      systemIds: c.systemIds.filter((systemId) => systemId !== id),
+    })),
     software: state.software.map((s) => {
       const systemIds = s.systemIds.filter((systemId) => systemId !== id);
       const activity = s.activity.filter((a) => a.systemId !== id);
