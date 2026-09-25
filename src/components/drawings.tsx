@@ -8,6 +8,8 @@ import {
   REQUIREMENT_STATES,
   addDrawing,
   addDrawingVersion,
+  drawingRevisionLabel,
+  nextDrawingRevision,
   approveDrawing,
   drawingApprovalFor,
   setDrawingRequirements,
@@ -15,6 +17,7 @@ import {
   type DrawingType,
 } from "@/lib/drawings";
 import { Modal, SelectionButtons } from "./shared-ui";
+import { drawingSummary, partRevisionLabel } from "@/lib/drawing-summary";
 type Commit = (change: (state: AppState) => AppState) => Promise<void>;
 type Form = {
   mode: "new" | "version" | "requirements" | "approval" | "applicability";
@@ -52,17 +55,12 @@ export function DrawingsSection({
           Add drawing
         </button>
       </div>
-      <p className="muted">
-        Record drawing versions and reviews here. Each drawing type keeps its
-        own approved revision. These are local records; CAD files and
-        authenticated sign-off are not connected yet.
-      </p>
       <section
         className="drawing-requirements"
-        aria-label="Drawing requirements"
+        aria-label="Drawings matched to part revision"
       >
         <div className="overview-section-heading">
-          <h3>Required drawing types</h3>
+          <h3>Drawings for this part revision</h3>
           <button
             className="text-button"
             onClick={() => setForm({ mode: "requirements", base: item })}
@@ -71,46 +69,55 @@ export function DrawingsSection({
           </button>
         </div>
         <label className="field">
-          Check drawing coverage for
+          Part revision
           <select
             value={coverageModel.id}
             onChange={(e) => setCoverageModelId(e.target.value)}
           >
-            {item.modelRevisions.map((r) => (
+            {[...item.modelRevisions].reverse().map((r) => (
               <option key={r.id} value={r.id}>
-                Working Rev{r.label}
-                {item.releases.some(
-                  (release) => release.modelRevisionId === r.id,
-                )
-                  ? ` · Released Rev${item.releases.find((release) => release.modelRevisionId === r.id)!.number}`
-                  : ""}
+                {partRevisionLabel(item, r.id)}
               </option>
             ))}
           </select>
         </label>
-        {item.drawingRequirements.map((r) => {
-          const drawing = item.drawings.find((d) => d.type === r.type);
-          return (
-            <div className="drawing-requirement" key={r.type}>
-              <strong>{r.type}</strong>
-              <span>{r.status}</span>
-              <small>
-                {r.status === "Required"
-                  ? drawing && drawingApprovalFor(drawing, coverageModel.id)
-                    ? `Approved for working model Rev${coverageModel.label}`
-                    : drawing?.versions.some(
-                          (v) => v.modelRevisionId === coverageModel.id,
-                        )
-                      ? `Draft for model Rev${coverageModel.label} exists · approval pending`
-                      : `No drawing version for model Rev${coverageModel.label}`
-                  : r.status === "Not assessed"
-                    ? "Needs assessment"
-                    : ""}
-                {r.reason && <span> · {r.reason}</span>}
-              </small>
-            </div>
-          );
-        })}
+        <p className="drawing-package-title">
+          {partRevisionLabel(item, coverageModel.id)}
+        </p>
+        <p className="muted">
+          {item.releases.some((r) => r.modelRevisionId === coverageModel.id)
+            ? "Drawing approvals recorded with this part release. Later changes are shown under their own part revision."
+            : "Drawing approvals for this exact part revision. Each drawing keeps its own DWG revision."}
+        </p>
+        <div className="drawing-package-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Drawing type</th>
+                <th>Drawing revision</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {drawingSummary(item, coverageModel.id).map((row) => (
+                <tr key={row.type}>
+                  <th scope="row">{row.type}</th>
+                  <td>
+                    <strong>{row.revision}</strong>
+                    {row.version !== undefined &&
+                      row.revision === "Unapproved draft" && (
+                        <small>Draft Rev{row.version}</small>
+                      )}
+                  </td>
+                  <td>
+                    {row.status}
+                    {row.detail && <small>{row.detail}</small>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
       {!item.drawings.length && (
         <div className="empty-state">
@@ -122,142 +129,157 @@ export function DrawingsSection({
           </p>
         </div>
       )}
-      <div className="drawing-cards">
-        {item.drawings.map((d) => {
-          const latest = d.versions[d.versions.length - 1];
-          const approved = d.approvals.find(
-            (a) => a.kind === "Approval" && a.versionId === latest.id,
-          );
-          return (
-            <article className="drawing-card" key={d.id}>
-              <div className="overview-section-heading">
-                <h3>{d.type} drawing</h3>
-                <span className="muted">
-                  {approved ? "Approved" : "Approval pending"}
-                </span>
-              </div>
-              <dl className="drawing-meta">
-                <div>
-                  <dt>Model revision (PRT REV)</dt>
-                  <dd>Rev{latest.modelRevision}</dd>
+      <details className="drawing-management">
+        <summary>Manage drawings &amp; working history</summary>
+        <p className="muted">
+          All drawing versions for this part. Approval records are local; CAD
+          files and authenticated sign-off are not connected yet.
+        </p>
+        <div className="drawing-cards">
+          {item.drawings.map((d) => {
+            const latest = d.versions[d.versions.length - 1];
+            const approved = d.approvals.find(
+              (a) => a.kind === "Approval" && a.versionId === latest.id,
+            );
+            return (
+              <article className="drawing-card" key={d.id}>
+                <div className="overview-section-heading">
+                  <h3>{d.type} drawing</h3>
+                  <span className="muted">
+                    {approved ? "Approved" : "Approval pending"}
+                  </span>
                 </div>
-                <div>
-                  <dt>
-                    {approved
-                      ? "Drawing revision (DWGREV)"
-                      : "Drawing draft (DWGREV)"}
-                  </dt>
-                  <dd>Rev{approved?.number ?? d.draftRevision}</dd>
-                </div>
-                <div>
-                  <dt>Working version</dt>
-                  <dd>{latest.version}</dd>
-                </div>
-                <div>
-                  <dt>Approved drawing revision</dt>
-                  <dd>
-                    {d.approvedRevision ? `Rev${d.approvedRevision}` : "None"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Drawn by</dt>
-                  <dd>{latest.drawnBy || "Not recorded"}</dd>
-                </div>
-              </dl>
-              <p className="drawing-notes">{latest.notes}</p>
-              <div className="drawing-actions">
-                <button
-                  className="button secondary"
-                  onClick={() =>
-                    setForm({ mode: "approval", base: item, drawingId: d.id })
-                  }
-                >
-                  Approve drawing
-                </button>
-                {!!d.approvals.length && (
+                <dl className="drawing-meta">
+                  <div>
+                    <dt>Model revision (PRT REV)</dt>
+                    <dd>Rev{latest.modelRevision}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      {approved
+                        ? "Drawing revision (DWGREV)"
+                        : "Drawing draft (DWGREV)"}
+                    </dt>
+                    <dd>Rev{approved?.number ?? d.draftRevision}</dd>
+                  </div>
+                  <div>
+                    <dt>Development revision</dt>
+                    <dd>Rev{drawingRevisionLabel(d, latest.id)}</dd>
+                  </div>
+                  <div>
+                    <dt>Approved drawing revision</dt>
+                    <dd>
+                      {d.approvedRevision ? `Rev${d.approvedRevision}` : "None"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Drawn by</dt>
+                    <dd>{latest.drawnBy || "Not recorded"}</dd>
+                  </div>
+                </dl>
+                <p className="drawing-notes">{latest.notes}</p>
+                <div className="drawing-actions">
                   <button
                     className="button secondary"
                     onClick={() =>
-                      setForm({
-                        mode: "applicability",
-                        base: item,
-                        drawingId: d.id,
-                      })
+                      setForm({ mode: "approval", base: item, drawingId: d.id })
                     }
                   >
-                    Confirm still applicable
+                    Approve drawing
                   </button>
-                )}
-                <button
-                  className="button secondary"
-                  onClick={() =>
-                    setForm({ mode: "version", base: item, drawingId: d.id })
-                  }
-                >
-                  Record working version
-                </button>
-                <button
-                  className="text-button"
-                  aria-expanded={expanded === d.id}
-                  aria-controls={`drawing-history-${d.id}`}
-                  onClick={() => setExpanded(expanded === d.id ? null : d.id)}
-                >
-                  {expanded === d.id ? "Hide" : "View"} version history (
-                  {d.versions.length})
-                </button>
-              </div>
-              {!!d.approvals.length && (
-                <details className="revision-details">
-                  <summary>Approval history ({d.approvals.length})</summary>
-                  {[...d.approvals].reverse().map((a) => (
-                    <article key={a.id}>
-                      <strong>
-                        DWG Rev{a.number} ·{" "}
-                        {a.kind === "Applicability"
-                          ? "Still applicable"
-                          : "Approved"}
-                      </strong>
-                      <p>
-                        Part working Rev
-                        {
-                          item.modelRevisions.find(
-                            (r) => r.id === a.modelRevisionId,
-                          )?.label
-                        }{" "}
-                        · Drawing version{" "}
-                        {d.versions.find((v) => v.id === a.versionId)?.version}
-                      </p>
-                      <p>
-                        Drawn by{" "}
-                        {d.versions.find((v) => v.id === a.versionId)?.drawnBy}{" "}
-                        · Checked by {a.checkedBy} · Approved by {a.approvedBy}
-                      </p>
-                      <p>{a.notes}</p>
-                      <small>{new Date(a.at).toLocaleString()}</small>
-                    </article>
-                  ))}
-                </details>
-              )}
-              {expanded === d.id && (
-                <div id={`drawing-history-${d.id}`} className="pdm-activity">
-                  {[...d.versions].reverse().map((v) => (
-                    <article key={v.id}>
-                      <strong>
-                        Working version {v.version} · Model Rev{v.modelRevision}
-                      </strong>
-                      <p>{v.notes}</p>
-                      <small>
-                        Drawn by {v.drawnBy || "not recorded"} · Recorded by{" "}
-                        {v.actor} · {new Date(v.at).toLocaleString()}
-                      </small>
-                    </article>
-                  ))}
+                  {!!d.approvals.length && (
+                    <button
+                      className="button secondary"
+                      onClick={() =>
+                        setForm({
+                          mode: "applicability",
+                          base: item,
+                          drawingId: d.id,
+                        })
+                      }
+                    >
+                      Confirm still applicable
+                    </button>
+                  )}
+                  <button
+                    className="button secondary"
+                    onClick={() =>
+                      setForm({ mode: "version", base: item, drawingId: d.id })
+                    }
+                  >
+                    Record drawing revision
+                  </button>
+                  <button
+                    className="text-button"
+                    aria-expanded={expanded === d.id}
+                    aria-controls={`drawing-history-${d.id}`}
+                    onClick={() => setExpanded(expanded === d.id ? null : d.id)}
+                  >
+                    {expanded === d.id ? "Hide" : "View"} revision history (
+                    {d.versions.length})
+                  </button>
                 </div>
-              )}
-            </article>
-          );
-        })}
-      </div>
+                {!!d.approvals.length && (
+                  <details className="revision-details">
+                    <summary>Approval history ({d.approvals.length})</summary>
+                    {[...d.approvals].reverse().map((a) => (
+                      <article key={a.id}>
+                        <strong>
+                          DWG Rev{a.number} ·{" "}
+                          {a.kind === "Applicability"
+                            ? "Still applicable"
+                            : "Approved"}
+                        </strong>
+                        <p>
+                          Part working Rev
+                          {
+                            item.modelRevisions.find(
+                              (r) => r.id === a.modelRevisionId,
+                            )?.label
+                          }{" "}
+                          · Drawing draft Rev{" "}
+                          {
+                            d.versions.find((v) => v.id === a.versionId)
+                              ?.revisionLabel
+                          }
+                        </p>
+                        <p>
+                          Drawn by{" "}
+                          {
+                            d.versions.find((v) => v.id === a.versionId)
+                              ?.drawnBy
+                          }{" "}
+                          · Checked by {a.checkedBy} · Approved by{" "}
+                          {a.approvedBy}
+                        </p>
+                        <p>{a.notes}</p>
+                        <small>{new Date(a.at).toLocaleString()}</small>
+                      </article>
+                    ))}
+                  </details>
+                )}
+                {expanded === d.id && (
+                  <div id={`drawing-history-${d.id}`} className="pdm-activity">
+                    {[...d.versions].reverse().map((v) => (
+                      <article key={v.id}>
+                        <strong>
+                          Drawing Rev{drawingRevisionLabel(d, v.id)} · Model Rev
+                          {v.modelRevision}
+                        </strong>
+                        <p>{v.notes}</p>
+                        <small>
+                          Drawn by {v.drawnBy || "not recorded"} · Recorded by{" "}
+                          {v.actor} · {new Date(v.at).toLocaleString()}
+                        </small>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </details>
       {form && (
         <DrawingForm
           form={form}
@@ -336,7 +358,7 @@ function DrawingForm({
     : isRequirements
       ? "Drawing requirements"
       : drawing
-        ? `${drawing.type}: new working version`
+        ? `${drawing.type}: new drawing revision`
         : "Add drawing record";
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -432,7 +454,7 @@ function DrawingForm({
               <>
                 <p className="pdm-notice">
                   {form.mode === "applicability"
-                    ? "Keep the existing DWG revision and record why the unchanged drawing applies. If the printed PRT REV or drawing content must change, record a new working version and approve it instead."
+                    ? "Keep the existing DWG revision and record why the unchanged drawing applies. If the printed PRT REV or drawing content must change, record a new drawing revision and approve it instead."
                     : "Approve an exact working drawing version. The DWG revision increases once on approval, independently of the part revision."}
                 </p>
                 <p className="muted">
@@ -440,7 +462,7 @@ function DrawingForm({
                   verification are not connected yet.
                 </p>
                 <label>
-                  Drawing working version
+                  Drawing revision
                   <select
                     value={versionId}
                     onChange={(e) => {
@@ -454,7 +476,7 @@ function DrawingForm({
                     }}
                   >
                     <option value="" disabled>
-                      Choose a version
+                      Choose a revision
                     </option>
                     {drawing!.versions
                       .filter(
@@ -467,7 +489,8 @@ function DrawingForm({
                       )
                       .map((v) => (
                         <option key={v.id} value={v.id}>
-                          Version {v.version} · Part working Rev
+                          Drawing Rev{drawingRevisionLabel(drawing!, v.id)} ·
+                          Part working Rev
                           {v.modelRevision}
                         </option>
                       ))}
@@ -574,8 +597,7 @@ function DrawingForm({
                     )?.label
                   }{" "}
                   · Drawing draft Rev
-                  {`${drawing?.approvedRevision ?? 0}.1`} · Working version{" "}
-                  {(previous?.version ?? 0) + 1}
+                  {drawing ? nextDrawingRevision(drawing) : "0.1"}
                   <br />
                   This records development progress. It does not upload a file
                   or approve a revision.
@@ -603,7 +625,7 @@ function DrawingForm({
                   />
                 </label>
                 <label>
-                  Working version notes
+                  Revision notes
                   <textarea
                     required
                     rows={4}
@@ -612,7 +634,7 @@ function DrawingForm({
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder={
                       drawing
-                        ? "Describe what changed since the previous working version"
+                        ? "Describe what changed since the previous drawing revision"
                         : "Describe the initial drawing and its purpose"
                     }
                   />
@@ -642,7 +664,7 @@ function DrawingForm({
                 : isRequirements
                   ? "Save requirements"
                   : drawing
-                    ? "Save working version"
+                    ? "Save drawing revision"
                     : "Create drawing"}
           </button>
         </div>

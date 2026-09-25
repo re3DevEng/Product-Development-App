@@ -2,6 +2,8 @@
 
 ## Agreed process
 
+September 25 numbering clarification: drawing development edits now advance Rev0.1, Rev0.2, etc. Approval assigns DWG Rev1; later development uses Rev1.1, Rev1.2 before DWG Rev2 approval. Each saved entry preserves its development label, separate from its approved whole revision. This supersedes earlier descriptions below of a fixed drawing draft label and visible working-version counter. Internal version IDs remain for exact associations.
+
 The planning summary is `output/pdf/PDM_Workflow_and_Rules.pdf` (September 23, 2026). It describes the intended final system, not current prototype capabilities. The parallel-release rules below supersede that PDF's earlier reconciliation rule; the PDF has not been regenerated.
 
 - PDM is separate from Features, Software, and Systems. Drive stores files; the planned shared database stores identities, revisions, approvals, and relationships.

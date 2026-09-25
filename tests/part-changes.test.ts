@@ -130,7 +130,7 @@ test("drawings keep exact source revision references when newer model revisions 
   const versions = updated.pdmItems[0].drawings[0].versions;
   assert.equal(versions[0].modelRevision, "0.1");
   assert.equal(versions[1].modelRevision, "0.2");
-  assert.equal(updated.pdmItems[0].drawings[0].draftRevision, "0.1");
+  assert.equal(updated.pdmItems[0].drawings[0].draftRevision, "0.2");
   assert.throws(
     () =>
       addDrawingVersion(

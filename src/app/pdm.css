@@ -251,6 +251,43 @@
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
+.drawing-package-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 20px 0 8px;
+}
+.drawing-package-table {
+  overflow-x: auto;
+}
+.drawing-package-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.drawing-package-table th,
+.drawing-package-table td {
+  padding: 16px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.drawing-package-table thead th {
+  font-size: 11px;
+  color: var(--muted);
+}
+.drawing-package-table small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+}
+.drawing-management {
+  margin-top: 24px;
+}
+.drawing-management > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 12px 0;
+}
 .pdm-part-picker {
   max-height: 360px;
   overflow: auto;

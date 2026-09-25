@@ -62,10 +62,16 @@ test("drawing working versions are independent from drawing and model revisions"
   const item = state.pdmItems[0];
   assert.equal(item.workingRevision, "0.1");
   assert.equal(item.drawings[0].versions.length, 10);
-  assert.equal(item.drawings[0].draftRevision, "0.1");
+  assert.equal(item.drawings[0].draftRevision, "0.10");
   assert.equal(item.drawings[0].approvedRevision, null);
   assert.equal(item.drawings[1].versions.length, 1);
   assert.deepEqual(item.drawings[0].versions[0], initial);
+  const legacy = JSON.parse(JSON.stringify(state));
+  for (const d of legacy.pdmItems[0].drawings) {
+    d.draftRevision = "0.1";
+    for (const v of d.versions) delete v.revisionLabel;
+  }
+  assert.deepEqual(readState(JSON.stringify(legacy)), state);
   assert.ok(item.drawings[0].versions.every((v) => v.modelRevision === "0.1"));
   assert.deepEqual(readState(JSON.stringify(state)), state);
   const edited = updatePdm(state, item.id, item.revision, {

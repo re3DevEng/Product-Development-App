@@ -1,4 +1,5 @@
 "use client";
+import { addPdmExamples, hasPdmExamples } from "@/lib/pdm-examples";
 
 import {
   useEffect,
@@ -2351,6 +2352,7 @@ function SettingsPage({
 }) {
   const [product, setProduct] = useState("");
   const [member, setMember] = useState("");
+  const [addingExamples, setAddingExamples] = useState(false);
   const [error, setError] = useState("");
   async function add(e: FormEvent, kind: "products" | "members") {
     e.preventDefault();
@@ -2471,6 +2473,30 @@ function SettingsPage({
           </p>
         </div>
         <div className="button-row">
+          <button
+            className="button secondary"
+            disabled={addingExamples || hasPdmExamples(state)}
+            onClick={async () => {
+              setAddingExamples(true);
+              setError("");
+              try {
+                await commit(addPdmExamples);
+                notify(
+                  "Three drawing workflow examples added to PDM Library, with linked ECRs/OCRs.",
+                );
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setAddingExamples(false);
+              }
+            }}
+          >
+            {hasPdmExamples(state)
+              ? "Drawing examples added"
+              : addingExamples
+                ? "Adding examples…"
+                : "Add drawing workflow examples"}
+          </button>
           <button className="button secondary" onClick={download}>
             <ArrowDownToLine size={16} />
             Download sample data
