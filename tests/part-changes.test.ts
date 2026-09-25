@@ -166,7 +166,7 @@ test("legacy model and drawing references migrate deterministically without rese
   assert.deepEqual(readState(raw), state);
   assert.deepEqual(readState(raw), readState(raw));
 });
-test("invalid, stale, duplicate and detached change efforts are rejected", () => {
+test("invalid, stale and detached change efforts are rejected", () => {
   const { state, input } = fixture();
   for (const bad of [
     { ...input, systemIds: [] },
@@ -181,14 +181,6 @@ test("invalid, stale, duplicate and detached change efforts are rejected", () =>
     () => startPartChange(result.state, input),
     /changed elsewhere/,
   );
-  assert.throws(
-    () =>
-      startPartChange(result.state, {
-        ...input,
-        sourceRecordRevision: result.state.pdmItems[0].revision,
-      }),
-    /already has/,
-  );
   const p = result.state.pdmItems[0];
   assert.throws(
     () =>
@@ -202,6 +194,63 @@ test("invalid, stale, duplicate and detached change efforts are rejected", () =>
     () => readState(JSON.stringify({ ...result.state, partChanges: [] })),
     /missing its change/,
   );
+});
+test("one ECR supports successive test revisions while preserving drawings, lineage and activity", () => {
+  const { state, input, item } = fixture();
+  let current = state;
+  let sourceRevisionId = input.sourceRevisionId;
+  for (const notes of [
+    "First design",
+    "Test revealed flex; add rib",
+    "Retest: adjust clearance",
+  ]) {
+    const before = current.pdmItems[0];
+    const result = startPartChange(current, {
+      ...input,
+      sourceRecordRevision: before.revision,
+      sourceRevisionId,
+      notes,
+    });
+    assert.equal(result.change.sourceRevisionId, sourceRevisionId);
+    assert.deepEqual(
+      result.state.pdmItems[0].modelRevisions.slice(0, -1),
+      before.modelRevisions,
+    );
+    assert.deepEqual(overlappingChanges(result.state, result.change), []);
+    assert.throws(
+      () =>
+        startPartChange(result.state, {
+          ...input,
+          sourceRecordRevision: before.revision,
+          sourceRevisionId,
+          notes,
+        }),
+      /changed elsewhere/,
+    );
+    sourceRevisionId = result.change.resultRevisionId;
+    current = result.state;
+  }
+  const updated = current.pdmItems[0];
+  assert.equal(updated.id, item.id);
+  assert.equal(updated.number, item.number);
+  assert.equal(updated.odooNumber, item.odooNumber);
+  assert.deepEqual(
+    updated.modelRevisions.map((r) => r.label),
+    ["0.1", "0.2", "0.3", "0.4"],
+  );
+  assert.equal(updated.workingRevision, "0.4");
+  assert.deepEqual(updated.drawings, item.drawings);
+  assert.equal(
+    current.partChanges.filter((c) => c.featureId === input.featureId).length,
+    3,
+  );
+  assert.equal(updated.activity.length, item.activity.length + 3);
+  const originalFeature = state.features.find((f) => f.id === input.featureId)!;
+  assert.equal(
+    current.features.find((f) => f.id === input.featureId)!.activity.length,
+    originalFeature.activity.length + 3,
+  );
+  assert.deepEqual(readState(JSON.stringify(current)), current);
 });
 test("permanent deletion cleans references while preserving independent model revision records", () => {
   const { state, input, features } = fixture();

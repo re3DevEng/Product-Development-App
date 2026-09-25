@@ -4,9 +4,29 @@ import { Plus, X } from "lucide-react";
 import type { AppState, Feature } from "@/lib/domain";
 import type { PdmItem } from "@/lib/pdm";
 import { startPartChange } from "@/lib/part-changes";
-import { overlappingChanges, type PartChange } from "@/lib/model-revisions";
+import { type PartChange } from "@/lib/model-revisions";
+import { nextWorkingLabel, latestRelease } from "@/lib/releases";
+import { ReleaseControls, ReleaseHistory, RevisionNotice } from "./releases";
 import { Modal, SelectionButtons } from "./shared-ui";
 type Commit = (change: (state: AppState) => AppState) => Promise<void>;
+
+function LatestPartRevisionBadge({
+  part,
+  revisionId,
+}: {
+  part: PdmItem;
+  revisionId: string;
+}) {
+  const release = part.releases.find((r) => r.modelRevisionId === revisionId);
+  const label = release
+    ? release.id === latestRelease(part)?.id
+      ? "Latest released"
+      : null
+    : part.modelRevisions.at(-1)?.id === revisionId
+      ? "Latest working"
+      : null;
+  return label ? <span className="revision-tag">{label}</span> : null;
+}
 
 export function PartChanges({
   state,
@@ -26,6 +46,12 @@ export function PartChanges({
     p.featureIds.includes(feature.id),
   );
   const changes = state.partChanges.filter((c) => c.featureId === feature.id);
+  const partIds = [
+    ...new Set([
+      ...changes.map((c) => c.resultPartId),
+      ...linked.map((p) => p.id),
+    ]),
+  ];
   return (
     <section className="overview-section">
       <h3>Parts & assemblies</h3>
@@ -40,20 +66,98 @@ export function PartChanges({
           </button>
         </div>
       )}
-      {changes.map((c) => (
-        <ChangeCard key={c.id} change={c} state={state} open={open} />
-      ))}
-      <div className="pdm-related">
-        {linked.map((p) => (
-          <button
-            className="button secondary"
-            key={p.id}
-            onClick={() => open(p.id)}
+      {partIds.map((id) => {
+        const part = state.pdmItems.find((p) => p.id === id)!;
+        const history = changes
+          .filter((c) => c.resultPartId === id)
+          .sort(
+            (a, b) =>
+              part.modelRevisions.findIndex(
+                (r) => r.id === b.resultRevisionId,
+              ) -
+              part.modelRevisions.findIndex((r) => r.id === a.resultRevisionId),
+          );
+        const [latest, ...earlier] = history;
+        return (
+          <section
+            key={id}
+            className="part-change-group"
+            aria-label={`${part.number} revision group`}
           >
-            {p.number} · {p.name}
-          </button>
-        ))}
-      </div>
+            <h4 className="change-part-heading">
+              <button
+                className="change-part-link"
+                onClick={() => open(part.id)}
+              >
+                <span className="change-part-identity">
+                  <strong className="change-part-number">{part.number}</strong>
+                  <small>{part.kind}</small>
+                </span>
+                <strong>{part.name}</strong>
+              </button>
+            </h4>
+            {latest ? (
+              <>
+                <ChangeCard
+                  change={latest}
+                  state={state}
+                  open={open}
+                  latestLabel={`Latest in ${feature.workType}`}
+                />
+                {!!earlier.length && (
+                  <details className="part-change-history">
+                    <summary
+                      aria-label={`Earlier revisions for ${part.number} (${earlier.length})`}
+                    >
+                      Earlier revisions ({earlier.length})
+                    </summary>
+                    {earlier.map((c) => (
+                      <ChangeCard
+                        key={c.id}
+                        change={c}
+                        state={state}
+                        open={open}
+                      />
+                    ))}
+                  </details>
+                )}
+              </>
+            ) : (
+              <div className="revision-context">
+                <button
+                  className="text-button"
+                  onClick={() => open(part.id, part.modelRevisions[0].id)}
+                >
+                  Rev
+                  {part.releases.find(
+                    (r) => r.modelRevisionId === part.modelRevisions[0].id,
+                  )?.number ?? part.modelRevisions[0].label}
+                </button>
+                <span>Linked initial revision</span>
+                <LatestPartRevisionBadge
+                  part={part}
+                  revisionId={part.modelRevisions[0].id}
+                />
+              </div>
+            )}
+            <ReleaseControls
+              part={part}
+              feature={feature}
+              revisionId={latest?.resultRevisionId ?? part.modelRevisions[0].id}
+              state={state}
+              commit={commit}
+            />
+            {!latest && (
+              <RevisionNotice
+                part={part}
+                revisionId={part.modelRevisions[0].id}
+                state={state}
+                open={open}
+              />
+            )}
+          </section>
+        );
+      })}
       {!linked.length && !changes.length && (
         <p className="muted">
           {feature.workType === "Unassigned"
@@ -78,10 +182,12 @@ function ChangeCard({
   change: c,
   state,
   open,
+  latestLabel,
 }: {
   change: PartChange;
   state: AppState;
   open: (id: string, revisionId?: string) => void;
+  latestLabel?: string;
 }) {
   const source = state.pdmItems.find((p) => p.id === c.sourcePartId)!;
   const result = state.pdmItems.find((p) => p.id === c.resultPartId)!;
@@ -91,54 +197,91 @@ function ChangeCard({
   const resultRev = result.modelRevisions.find(
     (r) => r.id === c.resultRevisionId,
   )!;
-  const overlaps = overlappingChanges(state, c);
+  const release = result.releases.find(
+    (r) => r.modelRevisionId === resultRev.id,
+  );
+  const sourceRelease = source.releases.find(
+    (r) => r.modelRevisionId === sourceRev.id,
+  );
   return (
-    <article className="drawing-card">
-      <h4>
-        {c.mode} · Draft Rev{resultRev.label}
-      </h4>
-      <p>
-        <button
-          className="text-button"
-          onClick={() => open(source.id, sourceRev.id)}
-        >
-          {source.number} Rev{sourceRev.label}
-        </button>{" "}
-        →{" "}
-        <button
-          className="text-button"
-          onClick={() => open(result.id, resultRev.id)}
-        >
-          {result.number} Rev{resultRev.label}
-        </button>
-      </p>
+    <article className="revision-row change-summary">
+      <div className="revision-heading">
+        <h4>
+          <button
+            className="change-revision-link"
+            onClick={() => open(result.id, resultRev.id)}
+          >
+            Rev{release?.number ?? resultRev.label}
+          </button>
+        </h4>
+        <span className="revision-tag">
+          {release ? "Release recorded" : "Draft"}
+        </span>
+        {latestLabel && <span className="revision-tag">{latestLabel}</span>}
+        <LatestPartRevisionBadge part={result} revisionId={resultRev.id} />
+        <time dateTime={c.createdAt}>
+          {new Date(c.createdAt).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </time>
+      </div>
+      <div className="revision-context">
+        <span>
+          {c.mode === "Create variant" ? "Variant of " : "From "}
+          <button
+            className="text-button"
+            onClick={() => open(source.id, sourceRev.id)}
+          >
+            {source.id !== result.id && `${source.number} `}Rev
+            {sourceRelease?.number ?? sourceRev.label}
+          </button>
+        </span>
+      </div>
       <p className="drawing-notes">{c.notes}</p>
-      <p className="muted">
-        Intended systems:{" "}
-        {c.systemIds
-          .map((id) => {
-            const p = state.projects.find((p) => p.id === id)!;
-            return `${p.number} · ${p.title}`;
-          })
-          .join(", ") ||
-          "No target systems remain; choose targets before release."}
-      </p>
-      <p className="muted">Ops numbering decision pending · Not released</p>
-      {!!overlaps.length && (
-        <p className="pdm-notice" role="status">
-          Reconciliation required before release: this source part is also being
-          changed in{" "}
-          {[
-            ...new Set(
-              overlaps.map((o) => {
-                const f = state.features.find((f) => f.id === o.featureId)!;
-                return `${f.workType} ${f.number}`;
-              }),
-            ),
-          ].join(", ")}
-          . Confirm the designs, target systems, and Ops numbering decision.
-        </p>
-      )}
+      <RevisionNotice
+        part={result}
+        revisionId={resultRev.id}
+        state={state}
+        open={open}
+      />
+      <details className="revision-details">
+        <summary
+          aria-label={`Details for ${result.number} Rev${resultRev.label}`}
+        >
+          Details
+        </summary>
+        <dl>
+          <dt>Intended systems</dt>
+          <dd>
+            {c.systemIds
+              .map((id) => {
+                const p = state.projects.find((p) => p.id === id)!;
+                return `${p.number} · ${p.title}`;
+              })
+              .join(", ") ||
+              "No target systems remain; choose targets before release."}
+          </dd>
+          <dt>Ops numbering</dt>
+          <dd>
+            {release
+              ? result.approvals.find((a) => a.id === release.approvalId)
+                  ?.opsNotes
+              : "Confirm at Engineering approval"}
+          </dd>
+          <dt>Release</dt>
+          <dd>
+            {release
+              ? `Rev${release.number} recorded`
+              : "Not released"}
+          </dd>
+          <dt>Working revision</dt>
+          <dd>Rev{resultRev.label}</dd>
+          <dt>Recorded</dt>
+          <dd>{new Date(c.createdAt).toLocaleString()}</dd>
+        </dl>
+      </details>
     </article>
   );
 }
@@ -156,11 +299,9 @@ export function ModelRevisionHistory({
 }) {
   return (
     <section aria-label="Model revision history">
-      <h3>Model revisions</h3>
-      <p className="muted">
-        Draft development records only. Source revisions are preserved; CAD
-        files and release publication are not connected.
-      </p>
+      <ReleaseHistory part={item} state={state} open={open} />
+      <h3>Development history</h3>
+      <p className="muted">Working revisions stay in history after release.</p>
       {[...item.modelRevisions]
         .reverse()
         .sort(
@@ -175,24 +316,93 @@ export function ModelRevisionHistory({
           const feature = state.features.find(
             (f) => f.id === change?.featureId,
           );
+          const source = state.pdmItems.find((p) => p.id === r.source?.partId);
+          const sourceRevision = source?.modelRevisions.find(
+            (revision) => revision.id === r.source?.revisionId,
+          );
+          const release = item.releases.find(
+            (release) => release.modelRevisionId === r.id,
+          );
           return (
             <article
-              className={`drawing-card ${r.id === selectedRevisionId ? "selected-model-revision" : ""}`}
+              className={`revision-row ${r.id === selectedRevisionId ? "selected-model-revision" : ""}`}
               key={r.id}
             >
-              {r.id === selectedRevisionId && (
-                <p className="muted">Selected source / result revision</p>
-              )}
-              <h4>
-                Rev{r.label} · {r.status}
-              </h4>
+              <div className="revision-heading">
+                <h4>Rev{r.label}</h4>
+                {release && (
+                  <span className="revision-tag">
+                    Released as Rev{release.number}
+                  </span>
+                )}
+                {!release && r.label === item.workingRevision && (
+                  <span className="revision-tag">Latest working</span>
+                )}
+                {r.id === selectedRevisionId && (
+                  <span className="revision-tag">Selected</span>
+                )}
+                <time dateTime={r.createdAt}>
+                  {new Date(r.createdAt).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </time>
+              </div>
+              <div className="revision-context">
+                {feature && (
+                  <strong>
+                    {feature.workType} {feature.number}
+                  </strong>
+                )}
+                {source && sourceRevision && (
+                  <span>
+                    {source.id === item.id ? "From " : "Variant of "}
+                    <button
+                      className="text-button"
+                      onClick={() => open(source.id, sourceRevision.id)}
+                    >
+                      {source.id !== item.id && `${source.number} `}Rev
+                      {sourceRevision.label}
+                    </button>
+                  </span>
+                )}
+              </div>
               <p className="drawing-notes">{r.notes}</p>
-              <p className="muted">
-                {new Date(r.createdAt).toLocaleString()}
-                {feature ? ` · ${feature.workType} ${feature.number}` : ""}
-              </p>
+              <RevisionNotice
+                part={item}
+                revisionId={r.id}
+                state={state}
+                open={open}
+              />
               {change && (
-                <ChangeCard change={change} state={state} open={open} />
+                <details className="revision-details">
+                  <summary aria-label={`Details for Rev${r.label}`}>
+                    Details
+                  </summary>
+                  <dl>
+                    <dt>Intended systems</dt>
+                    <dd>
+                      {change.systemIds
+                        .map((id) => {
+                          const system = state.projects.find(
+                            (p) => p.id === id,
+                          )!;
+                          return `${system.number} · ${system.title}`;
+                        })
+                        .join(", ") ||
+                        "No target systems remain; choose targets before release."}
+                    </dd>
+                    <dt>Ops numbering</dt>
+                    <dd>
+                      {release
+                        ? "Recorded with release"
+                        : "Confirm at Engineering approval"}
+                    </dd>
+                    <dt>Recorded</dt>
+                    <dd>{new Date(r.createdAt).toLocaleString()}</dd>
+                  </dl>
+                </details>
               )}
             </article>
           );
@@ -319,9 +529,21 @@ function ChangeForm({
                       className="pdm-row"
                       key={p.id}
                       onClick={() => {
+                        const previous = state.partChanges.find(
+                          (c) =>
+                            c.featureId === feature.id &&
+                            c.resultPartId === p.id,
+                        );
                         setSource(p);
                         setRevisionId(
-                          p.modelRevisions[p.modelRevisions.length - 1].id,
+                          previous?.resultRevisionId ??
+                            latestRelease(p)?.modelRevisionId ??
+                            p.modelRevisions[p.modelRevisions.length - 1].id,
+                        );
+                        setSystemIds(
+                          previous?.systemIds.filter((id) =>
+                            systems.some((s) => s.id === id),
+                          ) ?? [],
                         );
                         setVariantName(`${p.name} variant`);
                       }}
@@ -365,14 +587,19 @@ function ChangeForm({
                 >
                   {[...source.modelRevisions].reverse().map((r) => (
                     <option key={r.id} value={r.id}>
-                      Rev{r.label} · {r.status}
+                      {source.releases.some(
+                        (release) => release.modelRevisionId === r.id,
+                      )
+                        ? `Rev${source.releases.find((release) => release.modelRevisionId === r.id)!.number} · Release recorded (working ${r.label})`
+                        : `Rev${r.label} · Draft`}
                     </option>
                   ))}
                 </select>
               </label>
               <p className="muted">
-                The source is a draft, not a released baseline. Its revision
-                record and existing drawing versions will be preserved.
+                The selected source and its drawing history will be preserved.
+                Recorded releases are prototype metadata; CAD files are not
+                connected.
               </p>
               {state.partChanges.some(
                 (c) =>
@@ -385,9 +612,9 @@ function ChangeForm({
                   ),
               ) && (
                 <p className="pdm-notice">
-                  Another ECR/OCR is changing this source part. You can
-                  continue, but the designs and Ops numbering decision must be
-                  reconciled before either release.
+                  Another ECR/OCR is changing this part. Parallel work does not
+                  block release. If another revision releases first, Engineering
+                  must review its differences before releasing this work.
                 </p>
               )}
               <SelectionButtons
@@ -398,7 +625,7 @@ function ChangeForm({
               />
               <p className="muted">
                 {mode === "Revise existing part"
-                  ? `Keep ${source.number} and create working Rev0.${source.modelRevisions.length + 1}. Ops must confirm the final part-number treatment.`
+                  ? `Keep ${source.number} and create working Rev${nextWorkingLabel(source)}. Working labels do not reserve a release number. The next whole revision is assigned at release.`
                   : "Assign a new internal ID, start at Rev0.1, and retain the source link. The Odoo number stays pending Ops; drawings are not copied or approved automatically."}
               </p>
               {mode === "Create variant" && (

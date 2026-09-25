@@ -254,7 +254,18 @@ export function deleteFeature(
       const activity = p.activity.filter((a) => a.featureId !== id);
       return featureIds.length !== p.featureIds.length ||
         activity.length !== p.activity.length
-        ? { ...p, featureIds, activity, revision: p.revision + 1 }
+        ? {
+            ...p,
+            featureIds,
+            activity,
+            approvals: p.approvals.map((a) =>
+              a.featureId === id ? { ...a, featureId: null } : a,
+            ),
+            releases: p.releases.map((r) =>
+              r.featureId === id ? { ...r, featureId: null } : r,
+            ),
+            revision: p.revision + 1,
+          }
         : p;
     }),
     software: state.software.map((s) => {

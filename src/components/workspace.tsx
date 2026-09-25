@@ -163,6 +163,7 @@ export default function Workspace() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedSoftware, setSelectedSoftware] = useState<string | null>(null);
   const [selectedPdm, setSelectedPdm] = useState<string | null>(null);
+  const [pdmReturnFeature, setPdmReturnFeature] = useState<string | null>(null);
   const [selectedPdmRevision, setSelectedPdmRevision] = useState<string | null>(
     null,
   );
@@ -292,6 +293,7 @@ export default function Workspace() {
     !isHistory &&
     !isSoftware;
   const selectedFeature = state.features.find((f) => f.id === selected);
+  const pdmOrigin = state.features.find((f) => f.id === pdmReturnFeature);
   return (
     <div className="app-shell">
       {mobile && (
@@ -1013,6 +1015,7 @@ export default function Workspace() {
             <PdmLibrary
               state={state}
               open={(id) => {
+                setPdmReturnFeature(null);
                 setSelectedPdm(id);
                 setSelectedPdmRevision(null);
               }}
@@ -1094,6 +1097,11 @@ export default function Workspace() {
             setSelectedPdmRevision(revisionId ?? null);
           }}
           initialRevisionId={selectedPdmRevision ?? undefined}
+          backLabel={
+            pdmOrigin
+              ? `Back to ${pdmOrigin.workType} ${pdmOrigin.number}`
+              : undefined
+          }
           item={
             creatingPdm
               ? undefined
@@ -1103,6 +1111,11 @@ export default function Workspace() {
           commit={commit}
           close={() => {
             if (creatingPdm) setSelected(creatingPdm);
+            else if (
+              pdmReturnFeature &&
+              state.features.some((f) => f.id === pdmReturnFeature)
+            )
+              setSelected(pdmReturnFeature);
             setCreatingPdm(null);
             setSelectedPdm(null);
           }}
@@ -1113,6 +1126,7 @@ export default function Workspace() {
             setToast("Draft created and linked to this change.");
           }}
           openFeature={(id) => {
+            setPdmReturnFeature(null);
             setSelectedPdm(null);
             setSelected(id);
           }}
@@ -1122,9 +1136,11 @@ export default function Workspace() {
         <FeatureDialog
           key={creating ? "new" : selectedFeature!.id}
           feature={creating ? undefined : selectedFeature}
+          initialPartsTab={pdmReturnFeature === selectedFeature?.id}
           state={state}
           commit={commit}
           onClose={() => {
+            setPdmReturnFeature(null);
             setCreating(false);
             setSelected(null);
           }}
@@ -1140,6 +1156,7 @@ export default function Workspace() {
             setCreatingPdm(featureId);
           }}
           openPdm={(id, revisionId) => {
+            setPdmReturnFeature(selectedFeature?.id ?? null);
             setSelected(null);
             setSelectedPdm(id);
             setSelectedPdmRevision(revisionId ?? null);
@@ -1279,6 +1296,7 @@ function FeatureDialog({
   openSoftware,
   openPdm,
   createPdm,
+  initialPartsTab = false,
 }: {
   feature?: Feature;
   state: AppState;
@@ -1290,13 +1308,16 @@ function FeatureDialog({
   openSoftware: (id: string) => void;
   openPdm: (id: string, revisionId?: string) => void;
   createPdm: (featureId: string) => void;
+  initialPartsTab?: boolean;
 }) {
   const [base, setBase] = useState(feature);
   const [editing, setEditing] = useState(!feature);
   const [fields, setFields] = useState<FeatureFields>(() =>
     feature ? fieldsOf(feature) : blankFields(),
   );
-  const [tab, setTab] = useState("Overview");
+  const [tab, setTab] = useState(
+    initialPartsTab ? "Parts & assemblies" : "Overview",
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [docTitle, setDocTitle] = useState("");
@@ -1523,6 +1544,7 @@ function FeatureDialog({
             className="button primary"
             onClick={() => {
               setEditing(true);
+              setTab("Overview");
               setStatusMessage("");
               setError("");
             }}
@@ -1618,19 +1640,30 @@ function FeatureDialog({
       )}
       {base && (
         <div className="detail-tabs">
-          {["Overview", "Documents", "Activity"].map((t) => (
-            <button
-              className={tab === t ? "active" : ""}
-              key={t}
-              onClick={() => {
-                setTab(t);
-                setError("");
-              }}
-            >
-              {t}
-              {t === "Documents" && <span>{base.documents.length}</span>}
-            </button>
-          ))}
+          {["Overview", "Parts & assemblies", "Documents", "Activity"].map(
+            (t) => (
+              <button
+                className={tab === t ? "active" : ""}
+                key={t}
+                onClick={() => {
+                  setTab(t);
+                  setError("");
+                }}
+              >
+                {t}
+                {t === "Documents" && <span>{base.documents.length}</span>}
+                {t === "Parts & assemblies" && (
+                  <span>
+                    {
+                      state.pdmItems.filter((p) =>
+                        p.featureIds.includes(base.id),
+                      ).length
+                    }
+                  </span>
+                )}
+              </button>
+            ),
+          )}
         </div>
       )}
       <div className="drawer-scroll">
@@ -1742,13 +1775,6 @@ function FeatureDialog({
               open={openSoftware}
               commit={commit}
             />
-            <PartChanges
-              state={state}
-              feature={base}
-              commit={commit}
-              create={() => createPdm(base.id)}
-              open={openPdm}
-            />
             <section className="overview-section">
               <h3>Systems</h3>
               {state.projects.some((p) => p.featureIds.includes(base.id)) ? (
@@ -1823,6 +1849,32 @@ function FeatureDialog({
               </span>
             </div>
           </section>
+        )}
+        {tab === "Parts & assemblies" && base && (
+          <div className="feature-parts-tab">
+            {editing ? (
+              <div className="section-heading">
+                <p>
+                  Finish editing the feature to view and manage its parts and
+                  assemblies.
+                </p>
+                <button
+                  className="button secondary"
+                  onClick={() => setTab("Overview")}
+                >
+                  Return to feature edits
+                </button>
+              </div>
+            ) : (
+              <PartChanges
+                state={state}
+                feature={base}
+                commit={commit}
+                create={() => createPdm(base.id)}
+                open={openPdm}
+              />
+            )}
+          </div>
         )}
         {tab === "Overview" && editing && (
           <form id="feature-form" onSubmit={save} className="feature-form">

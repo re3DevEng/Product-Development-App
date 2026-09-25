@@ -1,4 +1,5 @@
 import { newId } from "./browser-support";
+import { nextWorkingLabel } from "./releases";
 import type { AppState } from "./domain";
 import { createPdm } from "./pdm";
 import type { PartChange, ModelRevision } from "./model-revisions";
@@ -52,18 +53,6 @@ export function startPartChange(
     input.notes.trim().length > 2000
   )
     throw new Error("Describe the proposed change in up to 2,000 characters.");
-  if (
-    input.mode === "Revise existing part" &&
-    state.partChanges.some(
-      (c) =>
-        c.featureId === feature.id &&
-        c.resultPartId === source.id &&
-        c.mode === input.mode,
-    )
-  )
-    throw new Error(
-      "This ECR/OCR already has a revision effort for that part.",
-    );
   let next = state;
   let result = source;
   let model: ModelRevision;
@@ -92,7 +81,7 @@ export function startPartChange(
   } else {
     model = {
       id: newId(),
-      label: `0.${source.modelRevisions.length + 1}`,
+      label: nextWorkingLabel(source),
       status: "Draft",
       createdAt: now,
       notes: input.notes.trim(),

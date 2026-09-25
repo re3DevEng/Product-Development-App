@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
-import { Box, Search, X, Pencil } from "lucide-react";
+import { Box, Search, X, Pencil, ArrowLeft } from "lucide-react";
 import type { AppState } from "@/lib/domain";
 import {
   blankPdm,
@@ -15,6 +15,8 @@ import {
 import { Modal, SelectionButtons } from "./shared-ui";
 import { DrawingsSection } from "./drawings";
 import { ModelRevisionHistory } from "./part-changes";
+import { latestRelease } from "@/lib/releases";
+import { StatusBadge } from "./record-badges";
 type Commit = (change: (state: AppState) => AppState) => Promise<void>;
 
 export function PdmLibrary({
@@ -50,8 +52,9 @@ export function PdmLibrary({
       </div>
       <p className="pdm-notice">
         Browse parts and assemblies here. Create new ones from an active ECR or
-        OCR's Parts & assemblies section. These records are drafts, saved in
-        this browser; controlled files and releases are not connected yet.
+        OCR's Parts & assemblies section. Records and approvals are saved in
+        this browser; shared storage and controlled CAD publication are not
+        connected yet.
       </p>
       <div className="filterbar">
         <label className="search-field">
@@ -96,7 +99,10 @@ export function PdmLibrary({
                 </small>
               </span>
               <span className="pdm-row-status">
-                Draft<small>Rev{p.workingRevision}</small>
+                {latestRelease(p)
+                  ? `Released Rev${latestRelease(p)!.number}`
+                  : "Draft"}
+                <small>Working Rev{p.workingRevision}</small>
               </span>
             </button>
           ))}
@@ -144,6 +150,7 @@ export function PdmDialog({
   sourceFeatureId,
   openPart,
   initialRevisionId,
+  backLabel,
 }: {
   item?: PdmItem;
   state: AppState;
@@ -154,6 +161,7 @@ export function PdmDialog({
   sourceFeatureId?: string;
   openPart: (id: string, revisionId?: string) => void;
   initialRevisionId?: string;
+  backLabel?: string;
 }) {
   const source = state.features.find((f) => f.id === sourceFeatureId);
   const initialFields = () => ({
@@ -232,6 +240,17 @@ export function PdmDialog({
       wide
       onClose={dismiss}
     >
+      {backLabel && (
+        <div className="pdm-back-navigation">
+          <button
+            className="button secondary"
+            onClick={dismiss}
+            disabled={busy}
+          >
+            <ArrowLeft size={16} /> {backLabel}
+          </button>
+        </div>
+      )}
       <div className="pdm-dialog-heading">
         <div>
           <span className="pdm-number">{base?.number || "NEW PDM RECORD"}</span>
@@ -448,6 +467,14 @@ export function PdmDialog({
               )}
               <dl className="pdm-summary">
                 <div>
+                  <dt>Latest recorded release</dt>
+                  <dd>
+                    {latestRelease(base)
+                      ? `Rev${latestRelease(base)!.number}`
+                      : "None"}
+                  </dd>
+                </div>
+                <div>
                   <dt>Internal ID</dt>
                   <dd>{base.number}</dd>
                 </div>
@@ -489,7 +516,10 @@ export function PdmDialog({
                           key={f.id}
                           onClick={() => openFeature(f.id)}
                         >
-                          {f.workType} {f.number} · {f.title}
+                          <span>
+                            {f.workType} {f.number} · {f.title}
+                          </span>
+                          <StatusBadge status={f.status} />
                         </button>
                       ))}
                   </div>
@@ -520,9 +550,10 @@ export function PdmDialog({
               <section className="overview-section">
                 <h3>Files & release</h3>
                 <p className="muted">
-                  This record is not released. Controlled CAD files, Engineering
-                  approvals, and system configurations will be added in the next
-                  stages.
+                  Engineering approval and release records can be recorded from
+                  a linked ECR/OCR's Parts & assemblies tab. These are prototype
+                  records only; controlled CAD publication, permissions, and
+                  machine configurations are not connected.
                 </p>
               </section>
             </>

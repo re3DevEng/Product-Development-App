@@ -27,9 +27,21 @@ export type DrawingVersion = {
 export type Drawing = {
   id: string;
   type: DrawingType;
-  draftRevision: "0.1";
-  approvedRevision: null;
+  draftRevision: string;
+  approvedRevision: number | null;
+  approvals: DrawingApproval[];
   versions: DrawingVersion[];
+};
+export type DrawingApproval = {
+  id: string;
+  number: number;
+  versionId: string;
+  modelRevisionId: string;
+  checkedBy: string;
+  approvedBy: string;
+  notes: string;
+  at: string;
+  kind: "Approval" | "Applicability";
 };
 export const blankDrawingRequirements = (): DrawingRequirement[] =>
   DRAWING_TYPES.map((type) => ({ type, status: "Not assessed", reason: "" }));
@@ -125,6 +137,7 @@ export function addDrawing(
     type,
     draftRevision: "0.1",
     approvedRevision: null,
+    approvals: [],
     versions: [version(item, 1, drawnBy, notes, now, modelRevisionId)],
   };
   return replace(
@@ -161,10 +174,16 @@ export function addDrawingVersion(
     item,
     {
       drawings: item.drawings.map((d) =>
-        d.id === drawingId ? { ...d, versions: [...d.versions, next] } : d,
+        d.id === drawingId
+          ? {
+              ...d,
+              draftRevision: `${d.approvedRevision ?? 0}.1`,
+              versions: [...d.versions, next],
+            }
+          : d,
       ),
     },
-    `${drawing.type} drawing: recorded working version ${next.version} for model Rev${next.modelRevision}; draft remains Rev${drawing.draftRevision}`,
+    `${drawing.type} drawing: recorded working version ${next.version} for model Rev${next.modelRevision}; drawing draft Rev${drawing.approvedRevision ?? 0}.1`,
     now,
   );
 }
@@ -239,14 +258,16 @@ export function validateDrawings(item: PdmItem) {
       ids.has(d.id) ||
       !DRAWING_TYPES.includes(d.type) ||
       types.has(d.type) ||
-      d.draftRevision !== "0.1" ||
-      d.approvedRevision !== null ||
+      !/^\d+\.1$/.test(d.draftRevision) ||
       !Array.isArray(d.versions) ||
       !d.versions.length
     )
       throw new Error("A saved drawing could not be read.");
     ids.add(d.id);
     types.add(d.type);
+    if (d.approvals === undefined) d.approvals = [];
+    if (!Array.isArray(d.approvals))
+      throw new Error("Invalid drawing approvals.");
     d.versions.forEach((v, i) => {
       if (v && v.modelRevisionId === undefined)
         v.modelRevisionId =
@@ -273,5 +294,175 @@ export function validateDrawings(item: PdmItem) {
         throw new Error("A saved drawing version could not be read.");
       versionIds.add(v.id);
     });
+    let number = 0;
+    const approvedVersions = new Set<string>();
+    for (const a of d.approvals) {
+      const v = d.versions.find((v) => v.id === a?.versionId);
+      if (
+        !a ||
+        !v ||
+        !a.id ||
+        ids.has(a.id) ||
+        !item.modelRevisions.some((r) => r.id === a.modelRevisionId) ||
+        ![a.checkedBy, a.approvedBy, a.notes].every(
+          (s) => typeof s === "string" && !!s.trim() && s.length <= 2000,
+        ) ||
+        typeof a.at !== "string" ||
+        !Number.isFinite(Date.parse(a.at))
+      )
+        throw new Error("Invalid drawing approval history.");
+      if (a.kind === "Approval") {
+        if (
+          a.number !== ++number ||
+          approvedVersions.has(v.id) ||
+          a.modelRevisionId !== v.modelRevisionId ||
+          !v.drawnBy.trim()
+        )
+          throw new Error("Invalid approved drawing revision.");
+        approvedVersions.add(v.id);
+      } else if (
+        a.kind !== "Applicability" ||
+        !d.approvals.some(
+          (prior) =>
+            prior.kind === "Approval" &&
+            prior.versionId === v.id &&
+            prior.number === a.number,
+        ) ||
+        !approvedVersions.has(v.id)
+      ) {
+        throw new Error("Invalid drawing applicability review.");
+      }
+      ids.add(a.id);
+    }
+    if (d.approvedRevision !== (number || null))
+      throw new Error("Invalid approved drawing revision.");
   }
+}
+
+export function drawingApprovalFor(d: Drawing, modelRevisionId: string) {
+  // A newer working version for this exact model requires a fresh approval.
+  const version = [...d.versions]
+    .reverse()
+    .find((v) => v.modelRevisionId === modelRevisionId);
+  return [...d.approvals]
+    .reverse()
+    .find(
+      (a) =>
+        a.modelRevisionId === modelRevisionId &&
+        (!version || a.versionId === version.id),
+    );
+}
+
+export function drawingReleaseIssues(
+  item: PdmItem,
+  modelRevisionId: string,
+): string[] {
+  return item.drawingRequirements.flatMap((r) => {
+    if (r.status === "Not assessed")
+      return [`${r.type}: assess whether this drawing is required.`];
+    if (r.status === "Not required") return [];
+    const drawing = item.drawings.find((d) => d.type === r.type);
+    return drawing && drawingApprovalFor(drawing, modelRevisionId)
+      ? []
+      : [`${r.type}: approval needed for this part revision.`];
+  });
+}
+
+export function approveDrawing(
+  state: AppState,
+  input: {
+    partId: string;
+    recordRevision: number;
+    drawingId: string;
+    versionId: string;
+    modelRevisionId: string;
+    checkedBy: string;
+    approvedBy: string;
+    notes: string;
+    kind: DrawingApproval["kind"];
+  },
+  at = new Date().toISOString(),
+): AppState {
+  const item = current(state, input.partId, input.recordRevision);
+  const drawing = item.drawings.find((d) => d.id === input.drawingId);
+  const v = drawing?.versions.find((v) => v.id === input.versionId);
+  if (
+    !drawing ||
+    !v ||
+    !item.modelRevisions.some((r) => r.id === input.modelRevisionId)
+  )
+    throw new Error("Choose an existing drawing version and part revision.");
+  if (
+    ![input.checkedBy, input.approvedBy, input.notes].every(
+      (s) => typeof s === "string" && !!s.trim() && s.length <= 2000,
+    )
+  )
+    throw new Error("Record Checked by, Approved by, and review notes.");
+  const latest = [...drawing.versions]
+    .reverse()
+    .find((v) => v.modelRevisionId === input.modelRevisionId);
+  let number: number;
+  if (input.kind === "Approval") {
+    if (v.modelRevisionId !== input.modelRevisionId || latest?.id !== v.id)
+      throw new Error(
+        "Approve the latest working drawing version for its associated part revision.",
+      );
+    if (!v.drawnBy.trim())
+      throw new Error(
+        "Record a working version with Drawn by filled in before approval.",
+      );
+    if (
+      drawing.approvals.some(
+        (a) => a.kind === "Approval" && a.versionId === v.id,
+      )
+    )
+      throw new Error("This drawing version is already approved.");
+    number = (drawing.approvedRevision ?? 0) + 1;
+  } else if (input.kind === "Applicability") {
+    const original = drawing.approvals.find(
+      (a) => a.kind === "Approval" && a.versionId === v.id,
+    );
+    if (!original)
+      throw new Error(
+        "Choose an approved drawing version for an applicability review.",
+      );
+    if (latest && latest.id !== v.id)
+      throw new Error(
+        "A working drawing exists for this part revision. Approve that version instead.",
+      );
+    if (drawingApprovalFor(drawing, input.modelRevisionId))
+      throw new Error(
+        "This part revision already has a current drawing approval.",
+      );
+    number = original.number;
+  } else throw new Error("Choose approval or applicability review.");
+  const approval: DrawingApproval = {
+    id: newId(),
+    number,
+    versionId: v.id,
+    modelRevisionId: input.modelRevisionId,
+    checkedBy: input.checkedBy.trim(),
+    approvedBy: input.approvedBy.trim(),
+    notes: input.notes.trim(),
+    kind: input.kind,
+    at,
+  };
+  return replace(
+    state,
+    item,
+    {
+      drawings: item.drawings.map((d) =>
+        d.id === drawing.id
+          ? {
+              ...d,
+              approvedRevision:
+                input.kind === "Approval" ? number : d.approvedRevision,
+              approvals: [...d.approvals, approval],
+            }
+          : d,
+      ),
+    },
+    `${drawing.type} drawing Rev${number}: ${input.kind === "Approval" ? "approved" : "approved as still applicable"} for model Rev${item.modelRevisions.find((r) => r.id === input.modelRevisionId)!.label}. Checked by ${approval.checkedBy}; approved by ${approval.approvedBy}. ${approval.notes}`,
+    at,
+  );
 }

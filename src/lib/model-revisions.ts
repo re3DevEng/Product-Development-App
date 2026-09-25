@@ -39,14 +39,16 @@ export function validateModelRevisions(item: PdmItem) {
     item.modelRevisions = [initialModelRevision(item.id, item.createdAt)];
   if (!Array.isArray(item.modelRevisions) || !item.modelRevisions.length)
     throw new Error("Model revision history is missing.");
-  const ids = new Set();
+  const ids = new Set(),
+    labels = new Set();
   item.modelRevisions.forEach((r, index) => {
     if (
       !r ||
       typeof r.id !== "string" ||
       !r.id ||
       ids.has(r.id) ||
-      r.label !== `0.${index + 1}` ||
+      !/^(0|[1-9]\d*)\.[1-9]\d*$/.test(r.label) ||
+      labels.has(r.label) ||
       r.status !== "Draft" ||
       typeof r.notes !== "string" ||
       !r.notes.trim() ||
@@ -59,6 +61,7 @@ export function validateModelRevisions(item: PdmItem) {
     )
       throw new Error("Invalid model revision history.");
     ids.add(r.id);
+    labels.add(r.label);
   });
   if (
     item.workingRevision !==
@@ -67,8 +70,8 @@ export function validateModelRevisions(item: PdmItem) {
     throw new Error("The working model revision does not match its history.");
 }
 export function overlappingChanges(state: AppState, change: PartChange) {
-  // Overlap follows source identity, including distinct revisions and variants.
-  // Archived/completed work still needs reconciliation; only cancelled/declined work is excluded.
+  // Informational parallel-work lookup only; this never blocks a release.
+  // Actual newer-release notices follow the result identity and source lineage.
   const unresolved = (c: PartChange) =>
     c.featureId &&
     state.features.some(

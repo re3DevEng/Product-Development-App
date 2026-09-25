@@ -8,7 +8,12 @@ import {
   addDrawingVersion,
   setDrawingRequirements,
   DRAWING_TYPES,
+  approveDrawing,
+  drawingApprovalFor,
+  drawingReleaseIssues,
 } from "../src/lib/drawings";
+import { startPartChange } from "../src/lib/part-changes";
+import { createProject, blankProject } from "../src/lib/projects";
 
 const make = () =>
   createPdm(makeSampleState(), { ...blankPdm(), name: "Bracket" }, "DC");
@@ -187,4 +192,183 @@ test("saved drawing corruption and unsupported approvals are rejected", () => {
     assert.throws(() =>
       readState(JSON.stringify({ ...state, pdmItems: [bad] })),
     );
+});
+
+test("drawing approval increments DWG revision once, preserves versions and rejects stale or duplicate approval", () => {
+  const made = make();
+  let s = addDrawing(
+    made.state,
+    made.item.id,
+    1,
+    "Machining",
+    "Drafter",
+    "Initial",
+  );
+  for (let n = 2; n <= 10; n++)
+    s = addDrawingVersion(
+      s,
+      made.item.id,
+      s.pdmItems[0].revision,
+      s.pdmItems[0].drawings[0].id,
+      "Drafter",
+      `Edit ${n}`,
+    );
+  const input = {
+    partId: made.item.id,
+    recordRevision: s.pdmItems[0].revision,
+    drawingId: s.pdmItems[0].drawings[0].id,
+    versionId: s.pdmItems[0].drawings[0].versions.at(-1)!.id,
+    modelRevisionId: made.item.modelRevisions[0].id,
+    checkedBy: "Checker",
+    approvedBy: "Engineering team",
+    notes: "Approved at review",
+    kind: "Approval" as const,
+  };
+  assert.throws(
+    () =>
+      approveDrawing(s, {
+        ...input,
+        versionId: s.pdmItems[0].drawings[0].versions[0].id,
+      }),
+    /latest working/,
+  );
+  assert.throws(
+    () => approveDrawing(s, { ...input, checkedBy: "" }),
+    /Checked by/,
+  );
+  s = approveDrawing(s, input);
+  const first = structuredClone(s.pdmItems[0].drawings[0].approvals[0]);
+  assert.equal(s.pdmItems[0].drawings[0].approvedRevision, 1);
+  assert.throws(() => approveDrawing(s, input), /changed elsewhere/);
+  assert.throws(
+    () =>
+      approveDrawing(s, { ...input, recordRevision: s.pdmItems[0].revision }),
+    /already approved/,
+  );
+  s = addDrawingVersion(
+    s,
+    made.item.id,
+    s.pdmItems[0].revision,
+    input.drawingId,
+    "Drafter",
+    "New changes",
+  );
+  assert.equal(s.pdmItems[0].drawings[0].draftRevision, "1.1");
+  assert.equal(
+    drawingApprovalFor(s.pdmItems[0].drawings[0], input.modelRevisionId),
+    undefined,
+  );
+  s = approveDrawing(s, {
+    ...input,
+    recordRevision: s.pdmItems[0].revision,
+    versionId: s.pdmItems[0].drawings[0].versions.at(-1)!.id,
+  });
+  assert.equal(s.pdmItems[0].drawings[0].approvedRevision, 2);
+  assert.deepEqual(s.pdmItems[0].drawings[0].approvals[0], first);
+  assert.deepEqual(readState(JSON.stringify(s)), s);
+  const legacy = JSON.parse(
+    JSON.stringify(
+      addDrawing(made.state, made.item.id, 1, "Inspection", "D", "Initial"),
+    ),
+  );
+  delete legacy.pdmItems[0].drawings[0].approvals;
+  assert.deepEqual(
+    readState(JSON.stringify(legacy)).pdmItems[0].drawings[0].approvals,
+    [],
+  );
+});
+
+test("applicability covers an exact new model without incrementing DWG revision; newer target drawing needs approval", () => {
+  const made = make();
+  let s = addDrawing(
+    made.state,
+    made.item.id,
+    1,
+    "Machining",
+    "Drafter",
+    "Initial",
+  );
+  const d = s.pdmItems[0].drawings[0];
+  const input = {
+    partId: made.item.id,
+    recordRevision: s.pdmItems[0].revision,
+    drawingId: d.id,
+    versionId: d.versions[0].id,
+    modelRevisionId: made.item.modelRevisions[0].id,
+    checkedBy: "Checker",
+    approvedBy: "Team",
+    notes: "Reviewed",
+    kind: "Approval" as const,
+  };
+  s = approveDrawing(s, input);
+  const f = s.features.find(
+    (f) => f.status === "In-Work" && f.workType !== "Unassigned",
+  )!;
+  const system = createProject(s, {
+    ...blankProject(),
+    title: "Drawing test",
+    description: "Test system",
+    product: "Gigabot",
+  });
+  s = system.state;
+  const change = startPartChange(s, {
+    featureId: f.id,
+    sourcePartId: made.item.id,
+    sourceRecordRevision: s.pdmItems[0].revision,
+    sourceRevisionId: input.modelRevisionId,
+    mode: "Revise existing part",
+    notes: "New model",
+    systemIds: [system.project.id],
+    variantName: "",
+    initials: "QA",
+  });
+  s = change.state;
+  const modelRevisionId = change.change.resultRevisionId;
+  assert.equal(
+    drawingApprovalFor(s.pdmItems[0].drawings[0], modelRevisionId),
+    undefined,
+  );
+  s = approveDrawing(s, {
+    ...input,
+    kind: "Applicability",
+    modelRevisionId,
+    recordRevision: s.pdmItems[0].revision,
+    notes:
+      "Unchanged drawing remains applicable; printed PRT REV needs no change",
+  });
+  assert.equal(
+    drawingApprovalFor(s.pdmItems[0].drawings[0], modelRevisionId)?.number,
+    1,
+  );
+  assert.equal(s.pdmItems[0].drawings[0].approvedRevision, 1);
+  assert.deepEqual(readState(JSON.stringify(s)), s);
+  s = addDrawingVersion(
+    s,
+    made.item.id,
+    s.pdmItems[0].revision,
+    d.id,
+    "Drafter",
+    "Changed printed part revision",
+    undefined,
+    modelRevisionId,
+  );
+  assert.equal(
+    drawingApprovalFor(s.pdmItems[0].drawings[0], modelRevisionId),
+    undefined,
+  );
+  assert.throws(
+    () =>
+      approveDrawing(s, {
+        ...input,
+        kind: "Applicability",
+        modelRevisionId,
+        recordRevision: s.pdmItems[0].revision,
+      }),
+    /working drawing exists/,
+  );
+  assert.equal(
+    drawingApprovalFor(s.pdmItems[0].drawings[0], input.modelRevisionId)
+      ?.number,
+    1,
+  );
 });

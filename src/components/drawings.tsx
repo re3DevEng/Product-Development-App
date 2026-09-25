@@ -8,6 +8,8 @@ import {
   REQUIREMENT_STATES,
   addDrawing,
   addDrawingVersion,
+  approveDrawing,
+  drawingApprovalFor,
   setDrawingRequirements,
   type DrawingRequirement,
   type DrawingType,
@@ -15,7 +17,7 @@ import {
 import { Modal, SelectionButtons } from "./shared-ui";
 type Commit = (change: (state: AppState) => AppState) => Promise<void>;
 type Form = {
-  mode: "new" | "version" | "requirements";
+  mode: "new" | "version" | "requirements" | "approval" | "applicability";
   base: PdmItem;
   drawingId?: string;
 };
@@ -29,6 +31,12 @@ export function DrawingsSection({
 }) {
   const [form, setForm] = useState<Form | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [coverageModelId, setCoverageModelId] = useState(
+    item.modelRevisions.at(-1)!.id,
+  );
+  const coverageModel =
+    item.modelRevisions.find((r) => r.id === coverageModelId) ??
+    item.modelRevisions.at(-1)!;
   return (
     <section aria-label="Drawings for this record">
       <div className="overview-section-heading">
@@ -45,8 +53,9 @@ export function DrawingsSection({
         </button>
       </div>
       <p className="muted">
-        Drawing records and working-version notes only. CAD files, checking,
-        approval, and release are not connected yet.
+        Record drawing versions and reviews here. Each drawing type keeps its
+        own approved revision. These are local records; CAD files and
+        authenticated sign-off are not connected yet.
       </p>
       <section
         className="drawing-requirements"
@@ -61,6 +70,24 @@ export function DrawingsSection({
             Edit requirements
           </button>
         </div>
+        <label className="field">
+          Check drawing coverage for
+          <select
+            value={coverageModel.id}
+            onChange={(e) => setCoverageModelId(e.target.value)}
+          >
+            {item.modelRevisions.map((r) => (
+              <option key={r.id} value={r.id}>
+                Working Rev{r.label}
+                {item.releases.some(
+                  (release) => release.modelRevisionId === r.id,
+                )
+                  ? ` · Released Rev${item.releases.find((release) => release.modelRevisionId === r.id)!.number}`
+                  : ""}
+              </option>
+            ))}
+          </select>
+        </label>
         {item.drawingRequirements.map((r) => {
           const drawing = item.drawings.find((d) => d.type === r.type);
           return (
@@ -69,11 +96,13 @@ export function DrawingsSection({
               <span>{r.status}</span>
               <small>
                 {r.status === "Required"
-                  ? drawing?.versions.some(
-                      (v) => v.modelRevision === item.workingRevision,
-                    )
-                    ? `Draft for model Rev${item.workingRevision} exists · approval pending`
-                    : `No drawing version for model Rev${item.workingRevision}`
+                  ? drawing && drawingApprovalFor(drawing, coverageModel.id)
+                    ? `Approved for working model Rev${coverageModel.label}`
+                    : drawing?.versions.some(
+                          (v) => v.modelRevisionId === coverageModel.id,
+                        )
+                      ? `Draft for model Rev${coverageModel.label} exists · approval pending`
+                      : `No drawing version for model Rev${coverageModel.label}`
                   : r.status === "Not assessed"
                     ? "Needs assessment"
                     : ""}
@@ -96,11 +125,16 @@ export function DrawingsSection({
       <div className="drawing-cards">
         {item.drawings.map((d) => {
           const latest = d.versions[d.versions.length - 1];
+          const approved = d.approvals.find(
+            (a) => a.kind === "Approval" && a.versionId === latest.id,
+          );
           return (
             <article className="drawing-card" key={d.id}>
               <div className="overview-section-heading">
                 <h3>{d.type} drawing</h3>
-                <span className="muted">Draft</span>
+                <span className="muted">
+                  {approved ? "Approved" : "Approval pending"}
+                </span>
               </div>
               <dl className="drawing-meta">
                 <div>
@@ -108,8 +142,12 @@ export function DrawingsSection({
                   <dd>Rev{latest.modelRevision}</dd>
                 </div>
                 <div>
-                  <dt>Drawing draft (DWGREV)</dt>
-                  <dd>Rev{d.draftRevision}</dd>
+                  <dt>
+                    {approved
+                      ? "Drawing revision (DWGREV)"
+                      : "Drawing draft (DWGREV)"}
+                  </dt>
+                  <dd>Rev{approved?.number ?? d.draftRevision}</dd>
                 </div>
                 <div>
                   <dt>Working version</dt>
@@ -117,7 +155,9 @@ export function DrawingsSection({
                 </div>
                 <div>
                   <dt>Approved drawing revision</dt>
-                  <dd>None</dd>
+                  <dd>
+                    {d.approvedRevision ? `Rev${d.approvedRevision}` : "None"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Drawn by</dt>
@@ -126,6 +166,28 @@ export function DrawingsSection({
               </dl>
               <p className="drawing-notes">{latest.notes}</p>
               <div className="drawing-actions">
+                <button
+                  className="button secondary"
+                  onClick={() =>
+                    setForm({ mode: "approval", base: item, drawingId: d.id })
+                  }
+                >
+                  Approve drawing
+                </button>
+                {!!d.approvals.length && (
+                  <button
+                    className="button secondary"
+                    onClick={() =>
+                      setForm({
+                        mode: "applicability",
+                        base: item,
+                        drawingId: d.id,
+                      })
+                    }
+                  >
+                    Confirm still applicable
+                  </button>
+                )}
                 <button
                   className="button secondary"
                   onClick={() =>
@@ -144,6 +206,38 @@ export function DrawingsSection({
                   {d.versions.length})
                 </button>
               </div>
+              {!!d.approvals.length && (
+                <details className="revision-details">
+                  <summary>Approval history ({d.approvals.length})</summary>
+                  {[...d.approvals].reverse().map((a) => (
+                    <article key={a.id}>
+                      <strong>
+                        DWG Rev{a.number} ·{" "}
+                        {a.kind === "Applicability"
+                          ? "Still applicable"
+                          : "Approved"}
+                      </strong>
+                      <p>
+                        Part working Rev
+                        {
+                          item.modelRevisions.find(
+                            (r) => r.id === a.modelRevisionId,
+                          )?.label
+                        }{" "}
+                        · Drawing version{" "}
+                        {d.versions.find((v) => v.id === a.versionId)?.version}
+                      </p>
+                      <p>
+                        Drawn by{" "}
+                        {d.versions.find((v) => v.id === a.versionId)?.drawnBy}{" "}
+                        · Checked by {a.checkedBy} · Approved by {a.approvedBy}
+                      </p>
+                      <p>{a.notes}</p>
+                      <small>{new Date(a.at).toLocaleString()}</small>
+                    </article>
+                  ))}
+                </details>
+              )}
               {expanded === d.id && (
                 <div id={`drawing-history-${d.id}`} className="pdm-activity">
                   {[...d.versions].reverse().map((v) => (
@@ -199,6 +293,15 @@ function DrawingForm({
   const [type, setType] = useState<DrawingType>(available[0] ?? "Machining");
   const [drawnBy, setDrawnBy] = useState(previous?.drawnBy ?? "");
   const [notes, setNotes] = useState("");
+  const [checkedBy, setCheckedBy] = useState("");
+  const [approvedBy, setApprovedBy] = useState("");
+  const [versionId, setVersionId] = useState(
+    form.mode === "applicability"
+      ? (drawing?.approvals.findLast((a) => a.kind === "Approval")?.versionId ??
+          "")
+      : (previous?.id ?? ""),
+  );
+  const isApproval = form.mode === "approval" || form.mode === "applicability";
   const [requirements, setRequirements] = useState(
     form.base.drawingRequirements.map((r) => ({ ...r })),
   );
@@ -209,7 +312,10 @@ function DrawingForm({
   const dirty = isRequirements
     ? JSON.stringify(requirements) !==
       JSON.stringify(form.base.drawingRequirements)
-    : modelRevisionId !== initialModelId ||
+    : !!checkedBy ||
+      !!approvedBy ||
+      versionId !== (previous?.id ?? "") ||
+      modelRevisionId !== initialModelId ||
       !!notes ||
       drawnBy !== (previous?.drawnBy ?? "") ||
       type !== (available[0] ?? "Machining");
@@ -223,40 +329,62 @@ function DrawingForm({
     if (!busy && (!dirty || window.confirm("Discard unsaved drawing changes?")))
       close();
   };
-  const title = isRequirements
-    ? "Drawing requirements"
-    : drawing
-      ? `${drawing.type}: new working version`
-      : "Add drawing record";
+  const title = isApproval
+    ? form.mode === "applicability"
+      ? "Confirm drawing still applicable"
+      : "Approve drawing"
+    : isRequirements
+      ? "Drawing requirements"
+      : drawing
+        ? `${drawing.type}: new working version`
+        : "Add drawing record";
   async function save(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
       await commit((s) =>
-        isRequirements
-          ? setDrawingRequirements(s, item.id, form.base.revision, requirements)
-          : drawing
-            ? addDrawingVersion(
+        isApproval
+          ? approveDrawing(s, {
+              partId: item.id,
+              recordRevision: form.base.revision,
+              drawingId: drawing!.id,
+              versionId,
+              modelRevisionId,
+              checkedBy,
+              approvedBy,
+              notes,
+              kind:
+                form.mode === "applicability" ? "Applicability" : "Approval",
+            })
+          : isRequirements
+            ? setDrawingRequirements(
                 s,
                 item.id,
                 form.base.revision,
-                drawing.id,
-                drawnBy,
-                notes,
-                undefined,
-                modelRevisionId,
+                requirements,
               )
-            : addDrawing(
-                s,
-                item.id,
-                form.base.revision,
-                type,
-                drawnBy,
-                notes,
-                undefined,
-                modelRevisionId,
-              ),
+            : drawing
+              ? addDrawingVersion(
+                  s,
+                  item.id,
+                  form.base.revision,
+                  drawing.id,
+                  drawnBy,
+                  notes,
+                  undefined,
+                  modelRevisionId,
+                )
+              : addDrawing(
+                  s,
+                  item.id,
+                  form.base.revision,
+                  type,
+                  drawnBy,
+                  notes,
+                  undefined,
+                  modelRevisionId,
+                ),
       );
       close();
     } catch (e) {
@@ -300,7 +428,99 @@ function DrawingForm({
             </p>
           )}
           <fieldset disabled={busy || stale}>
-            {isRequirements ? (
+            {isApproval ? (
+              <>
+                <p className="pdm-notice">
+                  {form.mode === "applicability"
+                    ? "Keep the existing DWG revision and record why the unchanged drawing applies. If the printed PRT REV or drawing content must change, record a new working version and approve it instead."
+                    : "Approve an exact working drawing version. The DWG revision increases once on approval, independently of the part revision."}
+                </p>
+                <p className="muted">
+                  Names record the team’s review. Sign-in and CAD file
+                  verification are not connected yet.
+                </p>
+                <label>
+                  Drawing working version
+                  <select
+                    value={versionId}
+                    onChange={(e) => {
+                      setVersionId(e.target.value);
+                      if (form.mode === "approval")
+                        setModelRevisionId(
+                          drawing!.versions.find(
+                            (v) => v.id === e.target.value,
+                          )!.modelRevisionId,
+                        );
+                    }}
+                  >
+                    <option value="" disabled>
+                      Choose a version
+                    </option>
+                    {drawing!.versions
+                      .filter(
+                        (v) =>
+                          form.mode !== "applicability" ||
+                          drawing!.approvals.some(
+                            (a) =>
+                              a.kind === "Approval" && a.versionId === v.id,
+                          ),
+                      )
+                      .map((v) => (
+                        <option key={v.id} value={v.id}>
+                          Version {v.version} · Part working Rev
+                          {v.modelRevision}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Part revision covered
+                  <select
+                    value={modelRevisionId}
+                    disabled={form.mode === "approval"}
+                    onChange={(e) => setModelRevisionId(e.target.value)}
+                  >
+                    {form.base.modelRevisions.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Working Rev{r.label}
+                        {form.base.releases.some(
+                          (release) => release.modelRevisionId === r.id,
+                        )
+                          ? ` · Released Rev${form.base.releases.find((release) => release.modelRevisionId === r.id)!.number}`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Checked by
+                  <input
+                    required
+                    maxLength={100}
+                    value={checkedBy}
+                    onChange={(e) => setCheckedBy(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Approved by / Engineering participants
+                  <input
+                    required
+                    maxLength={2000}
+                    value={approvedBy}
+                    onChange={(e) => setApprovedBy(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Review notes
+                  <textarea
+                    required
+                    maxLength={2000}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </label>
+              </>
+            ) : isRequirements ? (
               <>
                 <p>
                   Assess each type independently. Marking a drawing required
@@ -354,7 +574,7 @@ function DrawingForm({
                     )?.label
                   }{" "}
                   · Drawing draft Rev
-                  {drawing?.draftRevision ?? "0.1"} · Working version{" "}
+                  {`${drawing?.approvedRevision ?? 0}.1`} · Working version{" "}
                   {(previous?.version ?? 0) + 1}
                   <br />
                   This records development progress. It does not upload a file
@@ -417,11 +637,13 @@ function DrawingForm({
           >
             {busy
               ? "Saving…"
-              : isRequirements
-                ? "Save requirements"
-                : drawing
-                  ? "Save working version"
-                  : "Create drawing"}
+              : isApproval
+                ? "Record drawing approval"
+                : isRequirements
+                  ? "Save requirements"
+                  : drawing
+                    ? "Save working version"
+                    : "Create drawing"}
           </button>
         </div>
       </form>

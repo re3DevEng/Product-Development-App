@@ -7,6 +7,22 @@
   font-size: 12px;
   line-height: 1.7;
 }
+.pdm-back-navigation {
+  padding: 16px 24px 0;
+}
+.release-controls {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 10px;
+}
+.release-controls .drawing-actions {
+  margin-top: 8px;
+}
+.revision-warning .text-button {
+  display: inline;
+  font-size: inherit;
+  padding: 0;
+}
 .pdm-toolbar {
   display: flex;
   align-items: center;
@@ -249,4 +265,154 @@
 }
 .selected-model-revision {
   border-left: 3px solid #ffd400;
+}
+.revision-row {
+  padding: 18px 16px;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.revision-heading,
+.revision-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.revision-heading h4 {
+  margin: 0;
+  font-size: 20px;
+}
+.revision-heading time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.revision-tag {
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+.revision-context {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.revision-row .drawing-notes {
+  margin: 10px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.revision-warning {
+  margin: 10px 0;
+  padding-left: 10px;
+  border-left: 3px solid #ffd400;
+  font-size: 12px;
+  color: var(--muted);
+}
+.revision-details {
+  font-size: 12px;
+  color: var(--muted);
+}
+.revision-details summary {
+  cursor: pointer;
+  width: fit-content;
+  padding: 4px 0;
+}
+.revision-details dl {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 3fr;
+  gap: 10px 16px;
+  line-height: 1.5;
+}
+.revision-details dd {
+  margin: 0;
+}
+.change-summary:first-of-type {
+  margin-top: 20px;
+}
+.change-part-heading {
+  margin-bottom: 12px;
+}
+.change-part-link,
+.change-revision-link {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+.change-part-link .change-part-identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 6px;
+}
+.change-part-link .change-part-number {
+  font-size: 23px;
+  font-weight: 750;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: inherit;
+}
+.change-part-identity small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+.change-part-link strong {
+  font-size: 15px;
+}
+.change-part-link:hover strong,
+.change-revision-link:hover {
+  text-decoration: underline;
+}
+.revision-context > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+.revision-context .text-button {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+}
+.feature-parts-tab {
+  padding: 8px 24px 24px;
+}
+.part-change-group {
+  margin-top: 20px;
+  padding: 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.part-change-group > .change-part-heading {
+  margin: 0 0 12px;
+}
+.part-change-group > .change-summary {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+}
+.part-change-history {
+  margin-top: 12px;
+}
+.part-change-history > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 0;
+}
+.part-change-history .change-summary {
+  margin-top: 8px;
+  padding: 14px 0;
 }

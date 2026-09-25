@@ -1,4 +1,9 @@
 import { newId } from "./browser-support";
+import {
+  validateReleases,
+  type EngineeringApproval,
+  type PartRelease,
+} from "./releases";
 import type { Activity, AppState } from "./domain";
 import {
   initialModelRevision,
@@ -30,6 +35,8 @@ export type PdmItem = PdmFields & {
   revision: number; // Record concurrency version; independent of the CAD revision.
   workingRevision: string;
   modelRevisions: ModelRevision[];
+  approvals: EngineeringApproval[];
+  releases: PartRelease[];
   status: "Draft";
   createdAt: string;
   updatedAt: string;
@@ -147,6 +154,8 @@ export function createPdm(
     ...normalized,
     id,
     modelRevisions: [initialModelRevision(id, now)],
+    approvals: [],
+    releases: [],
     number: `${creatorInitials}-${String(sequence).padStart(5, "0")}`,
     creatorInitials,
     revision: 1,
@@ -208,6 +217,9 @@ export function updatePdm(
     );
   const normalized = validate(fields, state, id);
   if (
+    current.approvals.some(
+      (a) => a.featureId && !normalized.featureIds.includes(a.featureId),
+    ) ||
     state.partChanges.some(
       (c) =>
         c.resultPartId === id &&
@@ -289,6 +301,7 @@ export function validatePdmState(state: AppState) {
     validate(p, state, p.id);
     validateModelRevisions(p);
     validateDrawings(p);
+    validateReleases(p);
     const seq = Number(p.number.split("-")[1]);
     if (
       !Number.isSafeInteger(seq) ||
